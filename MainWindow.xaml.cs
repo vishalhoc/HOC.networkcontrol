@@ -354,6 +354,10 @@ public sealed partial class MainWindow : Window
 
     // ── Bulk Select & Block (#36) ─────────────────────────────────────────────
     private bool _allSelected;
+    // ── Checkbox tap stop-propagation (prevents Expander from toggling on checkbox click) ──
+    private void OnRowCheckboxTapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        => e.Handled = true;
+
     private void OnBulkSelectAll(object sender, RoutedEventArgs e)
     {
         _allSelected = !_allSelected;

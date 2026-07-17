@@ -21,6 +21,9 @@ public partial class ProcessConnection : ObservableObject
     [ObservableProperty] private bool _blockInbound;
     [ObservableProperty] private bool _blockOutbound;
 
+    // Geo-IP country label (#18) — e.g. "🇺🇸 US"
+    [ObservableProperty] private string _geoCountry = string.Empty;
+
     // Is this a listening / inbound connection (no remote address)
     public bool IsInbound => string.IsNullOrWhiteSpace(RemoteAddress)
                           || RemoteAddress == "0.0.0.0"

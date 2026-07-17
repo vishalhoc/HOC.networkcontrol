@@ -210,6 +210,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>  <!-- Top 5 button (#12) -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Upload -->
@@ -266,6 +267,48 @@
                                Text="{x:Bind ViewModel.FilteredProcesses.Count, Mode=OneWay}"/>
                     <TextBlock Text="apps" VerticalAlignment="Center" Foreground="Gray" FontSize="11"/>
                 </StackPanel>
+
+                <!-- Top 5 Bandwidth Consumers button (#12) -->
+                <Button Grid.Column="7" Padding="8,3" VerticalAlignment="Center" Margin="8,0,0,0"
+                        ToolTipService.ToolTip="Top bandwidth consumers">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel Width="280" Spacing="6" Padding="4">
+                                <TextBlock Text="🏆  Top Bandwidth Consumers" FontWeight="SemiBold" FontSize="13"/>
+                                <ListView ItemsSource="{x:Bind ViewModel.TopConsumers, Mode=OneWay}"
+                                          SelectionMode="None" MaxHeight="220">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="0,2"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="72"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding ProcessName}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
+                                                           FontSize="11" Foreground="{Binding DataUsageTier, Converter={StaticResource DataUsageTierToBrushConverter}}"
+                                                           HorizontalAlignment="Right"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE734;" FontSize="11"/>
+                        <TextBlock Text="Top 5" FontSize="11"/>
+                    </StackPanel>
+                </Button>
             </Grid>
         </Border>
 
@@ -281,31 +324,33 @@
             <!-- Column headers — must match item column widths exactly -->
             <Grid Grid.Row="0" Margin="40,2,4,2" Padding="0,2" ColumnSpacing="6">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="80"/>
-                    <ColumnDefinition Width="90"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="70"/>
-                    <ColumnDefinition Width="32"/>
-                    <ColumnDefinition Width="55"/>
-                    <ColumnDefinition Width="80"/>
-                    <ColumnDefinition Width="40"/>
-                    <ColumnDefinition Width="60"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="30"/>  <!-- checkbox -->
+                    <ColumnDefinition Width="160"/> <!-- app name + badges -->
+                    <ColumnDefinition Width="80"/>  <!-- adapter -->
+                    <ColumnDefinition Width="90"/>  <!-- type -->
+                    <ColumnDefinition Width="100"/> <!-- upload -->
+                    <ColumnDefinition Width="100"/> <!-- download -->
+                    <ColumnDefinition Width="70"/>  <!-- data -->
+                    <ColumnDefinition Width="62"/>  <!-- sparkline -->
+                    <ColumnDefinition Width="55"/>  <!-- widget -->
+                    <ColumnDefinition Width="80"/>  <!-- blk in/out -->
+                    <ColumnDefinition Width="40"/>  <!-- pin -->
+                    <ColumnDefinition Width="60"/>  <!-- http -->
+                    <ColumnDefinition Width="*"/>   <!-- block all -->
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"  Text="Application"  FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1"  Text="Adapter"      FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2"  Text="Type"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="3"  Text="↑ Upload"     FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="4"  Text="↓ Download"   FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="5"  Text="Data"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="6"  Text="##"           FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center" ToolTipService.ToolTip="Connection Count"/>
-                <TextBlock Grid.Column="7"  Text="Widget"       FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="8"  Text="Blk In/Out"   FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="9"  Text="Pin"          FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="10" Text="HTTP"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="11" Text="Block All"    FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="0"  Text="☑"           FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center" ToolTipService.ToolTip="Bulk select"/>
+                <TextBlock Grid.Column="1"  Text="Application"  FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2"  Text="Adapter"      FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="3"  Text="Type"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="4"  Text="↑ Upload"     FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="5"  Text="↓ Download"   FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="6"  Text="Data"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="7"  Text="Graph"        FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="8"  Text="Widget"       FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="9"  Text="Blk In/Out"   FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="10" Text="Pin"          FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="11" Text="HTTP"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="12" Text="Block All"    FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
             </Grid>
 
             <!-- Process List
@@ -327,13 +372,14 @@
                             <Expander.Header>
                                 <Grid HorizontalAlignment="Stretch" ColumnSpacing="6" Margin="0,2">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="26"/>
+                                        <ColumnDefinition Width="170"/>
                                         <ColumnDefinition Width="80"/>
                                         <ColumnDefinition Width="90"/>
                                         <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="32"/>
+                                        <ColumnDefinition Width="62"/>
                                         <ColumnDefinition Width="55"/>
                                         <ColumnDefinition Width="80"/>
                                         <ColumnDefinition Width="40"/>
@@ -341,14 +387,27 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
+                                    <!-- Bulk select checkbox (#36) — ToggleButton avoids MinWidth=120 and Expander-tap conflict -->
+                                    <ToggleButton Grid.Column="0"
+                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                  Width="22" Height="22" MinWidth="0" Padding="0"
+                                                  BorderThickness="1" CornerRadius="3"
+                                                  Tapped="OnRowCheckboxTapped"
+                                                  ToolTipService.ToolTip="Select for bulk action">
+                                        <ToggleButton.Resources>
+                                            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#0078D4"/>
+                                            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#106EBE"/>
+                                            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="White"/>
+                                        </ToggleButton.Resources>
+                                        <!-- Checkmark glyph — ToggleButton background shows checked state -->
+                                        <FontIcon Glyph="&#xE73E;" FontSize="11"/>
+                                    </ToggleButton>
+
                                     <!-- App name + badges row -->
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                        <!-- Bulk select checkbox (#36) -->
-                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                  VerticalAlignment="Center" Margin="0,0,2,0"
-                                                  ToolTipService.ToolTip="Select for bulk action"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding ProcessName}" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" MaxWidth="100"/>
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" MaxWidth="110"/>
                                         <!-- Suspicious warning (#26) -->
                                         <TextBlock Text="⚠" FontSize="11" VerticalAlignment="Center"
                                                    Foreground="#FBBC05" ToolTipService.ToolTip="Suspicious process: no path, temp location, or random name"
@@ -371,15 +430,15 @@
                                     </StackPanel>
 
                                     <!-- Adapter name -->
-                                    <TextBlock Grid.Column="1" Text="{Binding AdapterName}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                    <TextBlock Grid.Column="2" Text="{Binding AdapterName}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                                FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                ToolTipService.ToolTip="{Binding AdapterName}"/>
 
-                                    <TextBlock Grid.Column="2" Text="{Binding AppType}" Foreground="Gray" FontSize="11"
+                                    <TextBlock Grid.Column="3" Text="{Binding AppType}" Foreground="Gray" FontSize="11"
                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
 
                                     <!-- Upload speed + mini bar -->
-                                    <Grid Grid.Column="3" VerticalAlignment="Center">
+                                    <Grid Grid.Column="4" VerticalAlignment="Center">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="3"/>
@@ -392,7 +451,7 @@
                                     </Grid>
 
                                     <!-- Download speed + mini bar -->
-                                    <Grid Grid.Column="4" VerticalAlignment="Center">
+                                    <Grid Grid.Column="5" VerticalAlignment="Center">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="3"/>
@@ -404,24 +463,24 @@
                                                 Height="3" Background="#107C10" Opacity="0.7"/>
                                     </Grid>
 
-                                    <TextBlock Grid.Column="5" Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
+                                    <TextBlock Grid.Column="6" Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
                                                Foreground="Gray" FontSize="12" VerticalAlignment="Center"/>
 
                                     <!-- Sparkline chart (#13) -->
-                                    <controls:SparklineControl Grid.Column="6"
+                                    <controls:SparklineControl Grid.Column="7"
                                         SpeedSamples="{Binding SpeedHistory}"
                                         VerticalAlignment="Center" HorizontalAlignment="Center"
                                         ToolTipService.ToolTip="Real-time bandwidth (last 30 samples)"/>
 
                                     <!-- Widget toggle -->
-                                    <ToggleButton Grid.Column="7" IsChecked="{Binding ShowFloatingWidget, Mode=TwoWay}"
+                                    <ToggleButton Grid.Column="8" IsChecked="{Binding ShowFloatingWidget, Mode=TwoWay}"
                                                   Click="OnAppWidgetClicked" VerticalAlignment="Center" Padding="4,3"
                                                   ToolTipService.ToolTip="Per-app speed widget">
                                         <FontIcon Glyph="&#xE8B7;" FontSize="13"/>
                                     </ToggleButton>
 
                                     <!-- Block In + Block Out buttons -->
-                                    <StackPanel Grid.Column="8" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="9" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                                         <ToggleButton IsChecked="{Binding BlockInbound, Mode=TwoWay}"
                                                       Click="OnBlockInboundToggled" Padding="4,3"
                                                       ToolTipService.ToolTip="Block Inbound (→ App)">
@@ -435,21 +494,21 @@
                                     </StackPanel>
 
                                     <!-- Pin -->
-                                    <ToggleButton Grid.Column="9" IsChecked="{Binding IsPinned, Mode=TwoWay}"
+                                    <ToggleButton Grid.Column="10" IsChecked="{Binding IsPinned, Mode=TwoWay}"
                                                   Click="OnPinToggled" VerticalAlignment="Center" Padding="4,3"
                                                   ToolTipService.ToolTip="Pin to top">
                                         <FontIcon Glyph="&#xE718;" FontSize="13"/>
                                     </ToggleButton>
 
                                     <!-- HTTP Capture -->
-                                    <ToggleButton Grid.Column="10" IsChecked="{Binding IsHttpCaptureEnabled, Mode=TwoWay}"
+                                    <ToggleButton Grid.Column="11" IsChecked="{Binding IsHttpCaptureEnabled, Mode=TwoWay}"
                                                   Click="OnHttpCaptureToggled" VerticalAlignment="Center" Padding="4,3"
                                                   ToolTipService.ToolTip="HTTP Capture">
                                         <FontIcon Glyph="&#xE72C;" FontSize="13"/>
                                     </ToggleButton>
 
                                     <!-- Block All toggle switch -->
-                                    <ToggleSwitch Grid.Column="11" OffContent="" OnContent=""
+                                    <ToggleSwitch Grid.Column="12" OffContent="" OnContent=""
                                                   IsOn="{Binding IsBlocked, Mode=TwoWay}"
                                                   Toggled="OnBlockToggled" VerticalAlignment="Center"/>
                                 </Grid>

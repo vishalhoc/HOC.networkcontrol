@@ -156,6 +156,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<ProcessNetworkInfo> _filteredProcesses = new();
     [ObservableProperty] private long _globalTotalDataUsed;
 
+    /// <summary>Top 5 apps by total data used — updated each refresh cycle (#12).</summary>
+    [ObservableProperty] private ObservableCollection<ProcessNetworkInfo> _topConsumers = new();
+
     private string _searchText = string.Empty;
     public string SearchText
     {
@@ -275,7 +278,10 @@ public partial class MainViewModel : ObservableObject
                         if (existing != null)
                             existing.State = c.State;
                         else
+                        {
                             existingProc.Connections.Add(c);
+                            EnrichGeoIp(c); // (#18)
+                        }
                     }
 
                     for (int j = existingProc.Connections.Count - 1; j >= 0; j--)
@@ -333,7 +339,10 @@ public partial class MainViewModel : ObservableObject
 
                     newProc.Connections.Clear();
                     foreach (var c in newProc.CurrentConnections)
+                    {
                         newProc.Connections.Add(c);
+                        EnrichGeoIp(c); // (#18)
+                    }
 
                     // Remove phantom placeholder if the real process appeared
                     var phantom = Processes.FirstOrDefault(p => p.IsPhantom &&
@@ -404,6 +413,21 @@ public partial class MainViewModel : ObservableObject
             int cur  = FilteredProcesses.IndexOf(item);
             if (cur == -1) FilteredProcesses.Insert(i, item);
             else if (cur != i) FilteredProcesses.Move(cur, i);
+        }
+
+        // Update Top 5 consumers (#12)
+        var top5 = Processes
+            .Where(p => !p.IsPhantom && p.TotalDataUsed > 0)
+            .OrderByDescending(p => p.TotalDataUsed)
+            .Take(5).ToList();
+        for (int i = TopConsumers.Count - 1; i >= 0; i--)
+            if (!top5.Contains(TopConsumers[i])) TopConsumers.RemoveAt(i);
+        for (int i = 0; i < top5.Count; i++)
+        {
+            var item = top5[i];
+            int cur  = TopConsumers.IndexOf(item);
+            if (cur == -1) TopConsumers.Insert(i, item);
+            else if (cur != i) TopConsumers.Move(cur, i);
         }
     }
 
@@ -828,5 +852,41 @@ public partial class MainViewModel : ObservableObject
                 System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data_limits.log"), msg);
         }
         catch { }
+    }
+
+    // ── New-app alert toast (#30) ─────────────────────────────────────────────
+    private static readonly System.Collections.Generic.HashSet<string> _toastedApps = new();
+    private static void ShowNewAppToast(string processName, string path)
+    {
+        // Only alert once per app per session
+        if (!_toastedApps.Add(processName)) return;
+        try
+        {
+            string shortPath = string.IsNullOrEmpty(path) ? "unknown path"
+                : System.IO.Path.GetFileName(path);
+            string msg = $"[{DateTime.Now:HH:mm:ss}] NEW APP: '{processName}' ({shortPath}) accessed the network\n";
+            System.IO.File.AppendAllText(
+                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "new_apps.log"), msg);
+        }
+        catch { }
+    }
+
+    // ── Geo-IP enrichment (#18) ───────────────────────────────────────────────
+    private void EnrichGeoIp(WinNetControl.Models.ProcessConnection conn)
+    {
+        string ip = conn.RemoteAddress;
+        if (string.IsNullOrEmpty(ip)) return;
+
+        // Synchronous fast-path from cache
+        string cached = WinNetControl.Core.GeoIpService.GetCountryLabel(ip);
+        if (!string.IsNullOrEmpty(cached)) { conn.GeoCountry = cached; return; }
+
+        // Async fetch → marshal to UI thread
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            string label = await WinNetControl.Core.GeoIpService.GetCountryLabelAsync(ip);
+            if (!string.IsNullOrEmpty(label))
+                _dispatcherQueue?.TryEnqueue(() => conn.GeoCountry = label);
+        });
     }
 }
