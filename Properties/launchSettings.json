@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "WinNetControl (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "WinNetControl (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

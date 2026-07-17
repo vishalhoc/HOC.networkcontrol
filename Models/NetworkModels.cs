@@ -1,0 +1,198 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+
+namespace WinNetControl.Models;
+
+public partial class ProcessConnection : ObservableObject
+{
+    [ObservableProperty] private string _protocol     = string.Empty;
+    [ObservableProperty] private string _localAddress = string.Empty;
+    [ObservableProperty] private int    _localPort;
+    [ObservableProperty] private string _remoteAddress = string.Empty;
+    [ObservableProperty] private int    _remotePort;
+    [ObservableProperty] private string _state = string.Empty;
+    [ObservableProperty] private bool   _isBlocked;
+    [ObservableProperty] private int    _processId;
+    [ObservableProperty] private System.DateTime _lastActiveTime = System.DateTime.Now;
+    [ObservableProperty] private bool   _isActive = true;
+    [ObservableProperty] private bool   _isPinned;
+
+    // Direction-aware blocking
+    [ObservableProperty] private bool _blockInbound;
+    [ObservableProperty] private bool _blockOutbound;
+
+    // Is this a listening / inbound connection (no remote address)
+    public bool IsInbound => string.IsNullOrWhiteSpace(RemoteAddress)
+                          || RemoteAddress == "0.0.0.0"
+                          || RemoteAddress == "::"
+                          || RemoteAddress == "*"
+                          || State == "LISTEN"
+                          || State == "LISTENING";
+
+    private long   _totalDataUsed;
+    public  long   TotalDataUsed  { get => _totalDataUsed;  set => SetProperty(ref _totalDataUsed, value); }
+
+    private double _uploadSpeed;
+    public  double UploadSpeed    { get => _uploadSpeed;    set => SetProperty(ref _uploadSpeed,   System.Math.Round(value, 1)); }
+
+    private double _downloadSpeed;
+    public  double DownloadSpeed  { get => _downloadSpeed;  set => SetProperty(ref _downloadSpeed, System.Math.Round(value, 1)); }
+
+    public string LocalAddressPort  => $"{LocalAddress}:{LocalPort}";
+    public string RemoteAddressPort => RemotePort > 0
+        ? $"{RemoteAddress}:{RemotePort}"
+        : (string.IsNullOrWhiteSpace(RemoteAddress) || RemoteAddress == "0.0.0.0" || RemoteAddress == "::" ? "*" : RemoteAddress);
+
+    // Human-readable direction badge text
+    public string DirectionText => IsInbound ? "IN" : "OUT";
+
+    /// <summary>Converts numeric TCP state codes to named strings (e.g. "5" → "ESTABLISHED").</summary>
+    public string NormalizedState => State.Trim() switch
+    {
+        "1"  => "CLOSED",
+        "2"  => "LISTEN",
+        "3"  => "SYN_SENT",
+        "4"  => "SYN_RCVD",
+        "5"  => "ESTABLISHED",
+        "6"  => "FIN_WAIT",
+        "7"  => "CLOSE_WAIT",
+        "8"  => "CLOSING",
+        "9"  => "LAST_ACK",
+        "10" => "TIME_WAIT",
+        "11" => "DELETE_TCB",
+        "12" => "INACTIVE",
+        _    => string.IsNullOrWhiteSpace(State) ? "N/A" : State.ToUpperInvariant()
+    };
+}
+
+public partial class ProcessNetworkInfo : ObservableObject
+{
+    [ObservableProperty] private int    _processId;
+    [ObservableProperty] private string _processName = string.Empty;
+    [ObservableProperty] private string _processPath = string.Empty;
+    [ObservableProperty] private string _appType     = string.Empty;
+
+    // Is this a phantom (offline / not currently running) entry kept for blocked-app display?
+    [ObservableProperty] private bool _isPhantom;
+
+    private bool _isBlocked;
+    public  bool IsBlocked   { get => _isBlocked;   set => SetProperty(ref _isBlocked, value); }
+
+    // Direction-aware blocking
+    private bool _blockInbound;
+    public  bool BlockInbound  { get => _blockInbound;  set { if (SetProperty(ref _blockInbound,  value)) OnPropertyChanged(nameof(BlockStatusText)); } }
+
+    private bool _blockOutbound;
+    public  bool BlockOutbound { get => _blockOutbound; set { if (SetProperty(ref _blockOutbound, value)) OnPropertyChanged(nameof(BlockStatusText)); } }
+
+    public string BlockStatusText => (BlockInbound, BlockOutbound) switch
+    {
+        (true,  true)  => "Blocked (In+Out)",
+        (true,  false) => "Blocked Inbound",
+        (false, true)  => "Blocked Outbound",
+        _              => "Not Blocked"
+    };
+
+    private double _uploadSpeed;
+    public  double UploadSpeed   { get => _uploadSpeed;   set { if (SetProperty(ref _uploadSpeed, System.Math.Round(value, 1))) OnPropertyChanged(nameof(UploadSpeedRatio)); } }
+
+    private double _downloadSpeed;
+    public  double DownloadSpeed { get => _downloadSpeed; set { if (SetProperty(ref _downloadSpeed, System.Math.Round(value, 1))) OnPropertyChanged(nameof(DownloadSpeedRatio)); } }
+
+    private long _totalDataUsed;
+    public  long TotalDataUsed   { get => _totalDataUsed;  set => SetProperty(ref _totalDataUsed, value); }
+
+    // Speed ratios relative to the global max — set externally by ViewModel each update cycle
+    private double _maxUploadKbps  = 1;
+    private double _maxDownloadKbps = 1;
+
+    public void SetMaxSpeeds(double maxUp, double maxDown)
+    {
+        _maxUploadKbps  = System.Math.Max(maxUp,  1);
+        _maxDownloadKbps = System.Math.Max(maxDown, 1);
+        OnPropertyChanged(nameof(UploadSpeedRatio));
+        OnPropertyChanged(nameof(DownloadSpeedRatio));
+    }
+
+    /// <summary>0.0–1.0 ratio of this process's upload vs the global max (for mini speed bar).</summary>
+    public double UploadSpeedRatio   => System.Math.Clamp(UploadSpeed   / _maxUploadKbps,  0, 1);
+    /// <summary>0.0–1.0 ratio of this process's download vs the global max (for mini speed bar).</summary>
+    public double DownloadSpeedRatio => System.Math.Clamp(DownloadSpeed / _maxDownloadKbps, 0, 1);
+
+    private bool _showFloatingWidget;
+    public  bool ShowFloatingWidget { get => _showFloatingWidget; set => SetProperty(ref _showFloatingWidget, value); }
+
+    private bool _isPinned;
+    public  bool IsPinned { get => _isPinned; set => SetProperty(ref _isPinned, value); }
+
+    private bool _isHttpCaptureEnabled;
+    public  bool IsHttpCaptureEnabled { get => _isHttpCaptureEnabled; set => SetProperty(ref _isHttpCaptureEnabled, value); }
+
+    // Data limit exceeded flag (set by ViewModel when limit is hit)
+    private bool _isDataLimitExceeded;
+    public  bool IsDataLimitExceeded { get => _isDataLimitExceeded; set => SetProperty(ref _isDataLimitExceeded, value); }
+
+    // Network adapter name used by this app's connections (e.g. "Ethernet", "Wi-Fi")
+    private string _adapterName = string.Empty;
+    public  string AdapterName { get => _adapterName; set => SetProperty(ref _adapterName, value); }
+
+    public System.Collections.ObjectModel.ObservableCollection<ProcessConnection> Connections { get; } = new();
+
+    // Background-thread-safe snapshot
+    public System.Collections.Generic.List<ProcessConnection> CurrentConnections { get; set; } = new();
+
+    public int ConnectionCount => Connections.Count;
+
+    public ProcessNetworkInfo()
+    {
+        Connections.CollectionChanged += (s, e) => OnPropertyChanged(nameof(ConnectionCount));
+    }
+}
+
+public partial class HttpRequestInfo : ObservableObject
+{
+    [ObservableProperty] private System.Guid   _id;
+    [ObservableProperty] private string _url         = string.Empty;
+    [ObservableProperty] private string _method      = string.Empty;
+    [ObservableProperty] private string _host        = string.Empty;
+    [ObservableProperty] private int    _processId;
+    [ObservableProperty] private string _processName = string.Empty;
+    [ObservableProperty] private System.DateTime _timestamp = System.DateTime.Now;
+    [ObservableProperty] private int    _statusCode;
+    [ObservableProperty] private string _contentType = string.Empty;
+    [ObservableProperty] private long   _responseSize;
+
+    /// <summary>"200 OK", "404 Not Found" etc., empty if not yet received.</summary>
+    public string StatusText => StatusCode > 0 ? $"{StatusCode}" : "—";
+    /// <summary>Formatted timestamp HH:mm:ss.</summary>
+    public string TimeText   => Timestamp.ToString("HH:mm:ss");
+    /// <summary>Formatted response size.</summary>
+    public string SizeText   => ResponseSize > 0
+        ? (ResponseSize < 1024 ? $"{ResponseSize} B" : $"{ResponseSize / 1024.0:F1} KB") : "—";
+
+    // Cascade notifications to computed properties when backing fields change
+    partial void OnStatusCodeChanged(int value)       => OnPropertyChanged(nameof(StatusText));
+    partial void OnResponseSizeChanged(long value)    => OnPropertyChanged(nameof(SizeText));
+    partial void OnTimestampChanged(System.DateTime value)   => OnPropertyChanged(nameof(TimeText));
+}
+
+public partial class NetworkAdapterInfo : ObservableObject
+{
+    [ObservableProperty] private string _name = string.Empty;
+    [ObservableProperty] private int    _interfaceIndex;
+
+    private bool _isSelected;
+    public  bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (SetProperty(ref _isSelected, value))
+                SelectionChanged?.Invoke();
+        }
+    }
+
+    public System.Action? SelectionChanged { get; set; }
+}
+
+

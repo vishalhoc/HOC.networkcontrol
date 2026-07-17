@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="WinNetControl.OptimizeDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Internet &amp; Network Optimization"
+    PrimaryButtonText="Apply Selected"
+    CloseButtonText="Close"
+    DefaultButton="Close"
+    MinWidth="680">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="580">
+        <StackPanel Spacing="12" Padding="4,4,4,4">
+
+            <!-- ══ TCP Tuning ══ -->
+            <Expander Header="🔷 TCP Optimization" IsExpanded="True" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="10" Margin="0,8,0,0">
+
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- Auto-tuning -->
+                        <StackPanel Spacing="4">
+                            <CheckBox x:Name="TcpAutoTuningCheck" IsChecked="True"
+                                      Content="TCP Auto-Tuning Level"/>
+                            <ComboBox x:Name="TcpAutoTuningLevel" SelectedIndex="2" HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="disabled"/>
+                                <ComboBoxItem Content="highlyrestricted"/>
+                                <ComboBoxItem Content="restricted"/>
+                                <ComboBoxItem Content="normal"/>
+                                <ComboBoxItem Content="experimental"/>
+                            </ComboBox>
+                            <TextBlock Text="'normal' is ideal for most users. 'experimental' may boost throughput."
+                                       FontSize="10" Foreground="Gray" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <!-- Congestion -->
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <CheckBox x:Name="CongestionCheck" IsChecked="True"
+                                      Content="Congestion Provider"/>
+                            <ComboBox x:Name="CongestionProvider" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="ctcp"/>
+                                <ComboBoxItem Content="cubic"/>
+                                <ComboBoxItem Content="none"/>
+                            </ComboBox>
+                            <TextBlock Text="CTCP (Compound TCP) improves throughput on high-latency links."
+                                       FontSize="10" Foreground="Gray" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="RssCheck"      IsChecked="True"  Content="Enable RSS (Receive Side Scaling)"/>
+                        <CheckBox x:Name="ChimneyCheck"  Grid.Column="1" IsChecked="False" Content="Enable Chimney Offload (Legacy)"/>
+                        <CheckBox x:Name="TimestampsCheck" Grid.Column="2" IsChecked="False" Content="Enable TCP Timestamps"/>
+                    </Grid>
+
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="EcnCheck" IsChecked="False" Content="Enable ECN (Explicit Congestion Notification)"/>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <CheckBox x:Name="InitialRtoCheck" IsChecked="False" Content="Initial RTO (ms)"/>
+                            <NumberBox x:Name="InitialRtoValue" Value="2000" Minimum="300" Maximum="21000"
+                                       SpinButtonPlacementMode="Inline" SmallChange="100"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Button Content="📋 Show Current TCP Global State" Click="OnQueryTcp"
+                            Padding="10,5" HorizontalAlignment="Right"/>
+                </StackPanel>
+            </Expander>
+
+            <!-- ══ DNS ══ -->
+            <Expander Header="🌐 DNS Settings" IsExpanded="False" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="10" Margin="0,8,0,0">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="SetDnsCheck" IsChecked="False" Content="Set DNS Servers:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="DnsPrimaryBox" Grid.Column="1" PlaceholderText="Primary (e.g. 1.1.1.1)"/>
+                        <TextBox x:Name="DnsSecondaryBox" Grid.Column="2" PlaceholderText="Secondary (e.g. 1.0.0.1)"/>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Cloudflare (1.1.1.1)" Click="OnSetCloudflare" Padding="8,5"/>
+                        <Button Content="Google (8.8.8.8)" Click="OnSetGoogle" Padding="8,5"/>
+                        <Button Content="Quad9 (9.9.9.9)" Click="OnSetQuad9" Padding="8,5"/>
+                    </StackPanel>
+                    <CheckBox x:Name="FlushDnsCheck" IsChecked="True" Content="Flush DNS Cache"/>
+                    <TextBlock Text="DNS-over-HTTPS: Enable in Windows Settings → Network → DNS → Encryption"
+                               FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Expander>
+
+            <!-- ══ MTU ══ -->
+            <Expander Header="📦 MTU Settings" IsExpanded="False" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="10" Margin="0,8,0,0">
+                    <Button Content="📋 Show Current MTU (all adapters)" Click="OnShowMtu" Padding="10,5"/>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="SetMtuCheck" IsChecked="False" Content="Set MTU on adapter:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="MtuAdapterBox" Grid.Column="1" PlaceholderText="Adapter alias (e.g. Ethernet)"/>
+                        <NumberBox x:Name="MtuValueBox" Grid.Column="2" Value="1500" Minimum="576" Maximum="9000"
+                                   SpinButtonPlacementMode="Inline" Width="140"/>
+                    </Grid>
+                    <TextBlock Text="1500 = standard Ethernet. 1492 = PPPoE (DSL). 9000 = Jumbo frames (LAN only)."
+                               FontSize="10" Foreground="Gray" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Expander>
+
+            <!-- ══ Firewall / Kill Switch ══ -->
+            <Expander Header="🔥 Firewall &amp; Kill Switch" IsExpanded="False" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="10" Margin="0,8,0,0">
+                    <Border CornerRadius="6" Padding="10,8" Background="{ThemeResource SystemFillColorCautionBackgroundBrush}">
+                        <TextBlock Text="⚠ Kill Switch will BLOCK ALL internet traffic on all profiles. Use only in emergencies."
+                                   TextWrapping="Wrap" FontSize="12"/>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="KillSwitchOnBtn" Content="🔴 Enable Kill Switch (Block All Internet)"
+                                Click="OnKillSwitchOn"
+                                Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}" Padding="12,7"/>
+                        <Button x:Name="KillSwitchOffBtn" Content="🟢 Disable Kill Switch (Restore Internet)"
+                                Click="OnKillSwitchOff" Padding="12,7"/>
+                    </StackPanel>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="BlockPortBox" PlaceholderText="Port number (e.g. 4444)"/>
+                        <ComboBox x:Name="BlockPortDir" Grid.Column="1" SelectedIndex="1" HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="in (inbound)"/>
+                            <ComboBoxItem Content="out (outbound)"/>
+                        </ComboBox>
+                        <Button Grid.Column="2" Content="Block Port" Click="OnBlockPort" Padding="10,5"/>
+                        <Button Grid.Column="3" Content="Unblock Port" Click="OnUnblockPort" Padding="10,5"/>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="📋 List WinNetControl Rules" Click="OnListRules" Padding="10,5"/>
+                        <Button Content="🗑 Delete ALL WinNetControl Rules"
+                                Click="OnDeleteAllRules" Padding="10,5"
+                                Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
+
+            <!-- ══ Full Reset ══ -->
+            <Expander Header="🔄 Full Network Stack Reset" IsExpanded="False" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="10" Margin="0,8,0,0">
+                    <Border CornerRadius="6" Padding="10,8" Background="{ThemeResource SystemFillColorCautionBackgroundBrush}">
+                        <TextBlock Text="Runs: winsock reset, ip reset, tcp reset, ipconfig /release + /renew, flush DNS. A restart may be required."
+                                   TextWrapping="Wrap" FontSize="12"/>
+                    </Border>
+                    <Button Content="⚡ Reset Entire Network Stack" Click="OnFullReset" Padding="14,8"
+                            Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"/>
+                </StackPanel>
+            </Expander>
+
+            <!-- Output pane -->
+            <Expander x:Name="OutputExpander" Header="📄 Command Output" IsExpanded="False"
+                      HorizontalAlignment="Stretch">
+                <ScrollViewer MaxHeight="200">
+                    <TextBlock x:Name="OutputText" FontFamily="Consolas" FontSize="11"
+                               TextWrapping="Wrap" Padding="4"/>
+                </ScrollViewer>
+            </Expander>
+
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

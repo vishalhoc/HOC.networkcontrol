@@ -1,0 +1,242 @@
+<Window
+    x:Class="WinNetControl.AdapterManagerWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Network Adapter Manager">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ══ Toolbar ══ -->
+        <Border Grid.Row="0" Padding="14,10" BorderThickness="0,0,0,1"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="RefreshBtn" Click="OnRefresh" Padding="10,6">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+                            <TextBlock Text="Refresh" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnEnableSelected" Padding="10,6"
+                            ToolTipService.ToolTip="Enable selected adapter">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE768;" FontSize="13"
+                                      Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+                            <TextBlock Text="Enable" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnDisableSelected" Padding="10,6"
+                            ToolTipService.ToolTip="Disable selected adapter (requires Admin)">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE71A;" FontSize="13"
+                                      Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                            <TextBlock Text="Disable" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnRenewSelected" Padding="10,6"
+                            ToolTipService.ToolTip="Release + Renew IP for selected adapter">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE777;" FontSize="13"/>
+                            <TextBlock Text="Renew IP" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnDiagnoseSelected" Padding="10,6"
+                            ToolTipService.ToolTip="Run Windows Network Troubleshooter">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE9CE;" FontSize="13"/>
+                            <TextBlock Text="Diagnose" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnOpenNcpa" Padding="10,6"
+                            ToolTipService.ToolTip="Open Network Connections (ncpa.cpl)">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE839;" FontSize="13"/>
+                            <TextBlock Text="Connections" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE916;" FontSize="12" Opacity="0.5"/>
+                    <TextBlock x:Name="LastUpdateText" FontSize="11" Foreground="Gray"
+                               VerticalAlignment="Center" Text="Refreshing..."/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══ Column Headers ══ -->
+        <Border Grid.Row="1" Padding="14,6" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="180"/>
+                    <ColumnDefinition Width="70"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="" FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="Adapter Name" FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="Type"    FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="3" Text="Status"  FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="4" Text="Speed"   FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="5" Text="IPv4"    FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="6" Text="MAC / DNS / Gateway" FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="7" Text="↑ Sent / ↓ Recv" FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- ══ Adapter List ══ -->
+        <ListView Grid.Row="2" x:Name="AdapterList" SelectionMode="Single">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="14,6"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="MinHeight" Value="0"/>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Status dot -->
+                        <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                                 Fill="{Binding IsUp, Converter={StaticResource BoolToBrushConverter}}"/>
+
+                        <!-- Name + description -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{Binding Name}"/>
+                            <TextBlock Text="{Binding Description}" FontSize="10" Foreground="Gray"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+
+                        <!-- Type -->
+                        <TextBlock Grid.Column="2" Text="{Binding TypeText}" FontSize="11"
+                                   VerticalAlignment="Center" Foreground="Gray"/>
+
+                        <!-- Status text -->
+                        <Border Grid.Column="3" CornerRadius="4" Padding="6,2"
+                                HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <Border.Background>
+                                <SolidColorBrush Color="{ThemeResource SystemAccentColor}" Opacity="0.1"/>
+                            </Border.Background>
+                            <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{Binding IsUp, Converter={StaticResource BoolToBrushConverter}}"/>
+                        </Border>
+
+                        <!-- Speed -->
+                        <TextBlock Grid.Column="4" Text="{Binding SpeedText}" FontSize="11"
+                                   VerticalAlignment="Center" FontFamily="Consolas"/>
+
+                        <!-- IPv4 -->
+                        <TextBlock Grid.Column="5" Text="{Binding IPv4First}"
+                                   FontSize="11" VerticalAlignment="Center"
+                                   FontFamily="Consolas" TextTrimming="CharacterEllipsis"/>
+
+                        <!-- MAC + DNS + Gateway stacked -->
+                        <StackPanel Grid.Column="6" VerticalAlignment="Center" Spacing="1">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="MAC:" FontSize="9" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding MacAddress}" FontSize="10"
+                                           FontFamily="Consolas" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="GW:" FontSize="9" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Gateway}" FontSize="10" FontFamily="Consolas"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="DNS:" FontSize="9" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding DnsServers}" FontSize="10"
+                                           FontFamily="Consolas" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Bytes sent / recv -->
+                        <StackPanel Grid.Column="7" VerticalAlignment="Center" Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                <TextBlock Text="↑" FontSize="10" Foreground="#0078D4"/>
+                                <TextBlock Text="{Binding BytesSent, Converter={StaticResource SizeConverter}}"
+                                           FontSize="10" Foreground="#0078D4" FontFamily="Consolas"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                <TextBlock Text="↓" FontSize="10" Foreground="#107C10"/>
+                                <TextBlock Text="{Binding BytesReceived, Converter={StaticResource SizeConverter}}"
+                                           FontSize="10" Foreground="#107C10" FontFamily="Consolas"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Right-click context -->
+                        <Grid.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Enable" Click="OnMenuEnable">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Disable" Click="OnMenuDisable">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE71A;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutSeparator/>
+                                <MenuFlyoutItem Text="Renew IP (Release + Renew)" Click="OnMenuRenew">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE777;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Diagnose / Troubleshoot" Click="OnMenuDiagnose">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE9CE;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutSeparator/>
+                                <MenuFlyoutItem Text="Copy IP Address" Click="OnMenuCopyIp">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Copy MAC Address" Click="OnMenuCopyMac">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </Grid.ContextFlyout>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- ══ Status bar ══ -->
+        <Border Grid.Row="3" Padding="14,7" BorderThickness="0,1,0,0"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource LayerFillColorDefaultBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusBar" FontSize="11" Foreground="Gray" VerticalAlignment="Center"
+                           Text="Select an adapter to manage it. Right-click for more options."/>
+                <TextBlock x:Name="CountBar" Grid.Column="1" FontSize="11" Foreground="Gray"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

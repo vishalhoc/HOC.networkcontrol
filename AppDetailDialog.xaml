@@ -1,0 +1,386 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="WinNetControl.AppDetailDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    PrimaryButtonText="Close"
+    DefaultButton="Primary"
+    MinWidth="680">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="700" MinWidth="640">
+        <StackPanel Spacing="12" Padding="0,2,0,8">
+
+            <!-- ═══ HEADER ═══════════════════════════════════════════════════ -->
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="52"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- App icon placeholder -->
+                <Border Width="52" Height="52" CornerRadius="12"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        VerticalAlignment="Center">
+                    <Image x:Name="AppIconImg" Stretch="Uniform" Width="36" Height="36"/>
+                </Border>
+
+                <!-- Name / path / meta -->
+                <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                    <TextBlock x:Name="AppNameText" FontSize="20" FontWeight="SemiBold"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="AppPathText" FontSize="11" Foreground="Gray"
+                               TextWrapping="Wrap" FontFamily="Consolas"
+                               ToolTipService.ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,2,0,0">
+                        <TextBlock x:Name="AppTypeText"    FontSize="11" Foreground="Gray"/>
+                        <TextBlock x:Name="AppAdapterText" FontSize="11"
+                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        <TextBlock x:Name="AppPidText"     FontSize="11" Foreground="Gray"/>
+                        <TextBlock x:Name="AppCompanyText" FontSize="11" Foreground="Gray"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Block badge -->
+                <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Border x:Name="BlockBadge" CornerRadius="20" Padding="14,6">
+                        <TextBlock x:Name="BlockBadgeText" FontWeight="SemiBold" FontSize="12"/>
+                    </Border>
+                    <Button x:Name="KillBtn" Padding="10,4" HorizontalAlignment="Center"
+                            Click="OnKillProcess"
+                            Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                            ToolTipService.ToolTip="Terminate this process">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <FontIcon Glyph="&#xE711;" FontSize="11"
+                                      Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                            <TextBlock Text="Kill Process" FontSize="11"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- ═══ STAT CARDS ════════════════════════════════════════════════ -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border CornerRadius="8" Padding="12,10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel Spacing="3" HorizontalAlignment="Center">
+                        <TextBlock Text="↑ Upload" FontSize="10" Foreground="#0078D4" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="UploadText" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="#0078D4" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" CornerRadius="8" Padding="12,10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel Spacing="3" HorizontalAlignment="Center">
+                        <TextBlock Text="↓ Download" FontSize="10" Foreground="#107C10" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="DownloadText" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="#107C10" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" CornerRadius="8" Padding="12,10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel Spacing="3" HorizontalAlignment="Center">
+                        <TextBlock Text="Total Data" FontSize="10" Foreground="Gray" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="TotalDataText" FontSize="18" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="3" CornerRadius="8" Padding="12,10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel Spacing="3" HorizontalAlignment="Center">
+                        <TextBlock Text="Connections" FontSize="10" Foreground="Gray" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="ConnCountText" FontSize="18" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ═══ PROCESS INFORMATION ══════════════════════════════════════ -->
+            <Expander Header="ℹ️  Process Information"
+                      IsExpanded="True" HorizontalAlignment="Stretch">
+                <Border CornerRadius="8" Padding="14,10" Margin="0,8,0,0"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
+                    <Grid ColumnSpacing="10" RowSpacing="7">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Process Name:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoProcName" Grid.Column="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+
+                        <TextBlock Grid.Column="2" Text="PID:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoPid" Grid.Column="3" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="1" Text="Product Name:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoProduct" Grid.Row="1" Grid.Column="1" FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="Company:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoCompany" Grid.Row="1" Grid.Column="3" FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap"/>
+
+                        <TextBlock Grid.Row="2" Text="Version:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoVersion" Grid.Row="2" Grid.Column="1" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="Start Time:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoStartTime" Grid.Row="2" Grid.Column="3" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="3" Text="Executable Path:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoPath" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3"
+                                   FontSize="11" FontFamily="Consolas" Foreground="Gray"
+                                   TextWrapping="Wrap"
+                                   ToolTipService.ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </Grid>
+                </Border>
+            </Expander>
+
+            <!-- ═══ FIREWALL RULE DETAILS ═════════════════════════════════════ -->
+            <Expander Header="🔥  Firewall Rule Details"
+                      IsExpanded="True" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="10" Margin="0,8,0,0">
+
+                    <!-- Inbound Rule -->
+                    <Border CornerRadius="8" Padding="14,12"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1">
+                        <StackPanel Spacing="7">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE7BA;" FontSize="14"
+                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                <TextBlock Text="Inbound Rule" FontWeight="SemiBold" FontSize="13"/>
+                            </StackPanel>
+                            <TextBlock x:Name="InRuleName" FontSize="11" Foreground="Gray"
+                                       FontFamily="Consolas" TextWrapping="Wrap"/>
+                            <Grid ColumnSpacing="10" RowSpacing="5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Action:"    FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="InRuleAction" Grid.Column="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="Direction:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="→ App (Inbound)" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Row="1" Text="Enabled:"   FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="InRuleEnabled" Grid.Row="1" Grid.Column="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Program:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="InRulePath" Grid.Row="1" Grid.Column="3" FontSize="10" Foreground="Gray"
+                                           TextWrapping="Wrap" VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Outbound Rule -->
+                    <Border CornerRadius="8" Padding="14,12"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1">
+                        <StackPanel Spacing="7">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE7BA;" FontSize="14"
+                                          Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                <TextBlock Text="Outbound Rule" FontWeight="SemiBold" FontSize="13"/>
+                            </StackPanel>
+                            <TextBlock x:Name="OutRuleName" FontSize="11" Foreground="Gray"
+                                       FontFamily="Consolas" TextWrapping="Wrap"/>
+                            <Grid ColumnSpacing="10" RowSpacing="5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Action:"    FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="OutRuleAction" Grid.Column="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="Direction:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="App → (Outbound)" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Row="1" Text="Enabled:"   FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="OutRuleEnabled" Grid.Row="1" Grid.Column="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Program:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="OutRulePath" Grid.Row="1" Grid.Column="3" FontSize="10" Foreground="Gray"
+                                           TextWrapping="Wrap" VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Block control buttons -->
+                    <Border CornerRadius="8" Padding="12,10"
+                            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="BlockAllBtn" Grid.Column="0" Click="OnBlockAll" Padding="12,7"
+                                    Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <FontIcon Glyph="&#xF140;" FontSize="12"/>
+                                    <TextBlock Text="Block All" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="BlockInBtn" Grid.Column="1" Click="OnBlockIn" Padding="12,7">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="←" FontSize="12"/>
+                                    <TextBlock Text="Block Inbound" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="BlockOutBtn" Grid.Column="2" Click="OnBlockOut" Padding="12,7">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="Block Outbound" FontSize="12"/>
+                                    <TextBlock Text="→" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="UnblockBtn" Grid.Column="3" Click="OnUnblockAll" Padding="12,7"
+                                    Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <FontIcon Glyph="&#xE73E;" FontSize="12"/>
+                                    <TextBlock Text="Unblock All" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="OpenFwBtn" Grid.Column="5" Click="OnOpenFirewall" Padding="12,7">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <FontIcon Glyph="&#xE7BA;" FontSize="12"/>
+                                    <TextBlock Text="Open Firewall" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Expander>
+
+            <!-- ═══ ACTIVE CONNECTIONS ════════════════════════════════════════ -->
+            <Expander Header="🔗  Active Connections"
+                      IsExpanded="True" HorizontalAlignment="Stretch">
+                <Border Margin="0,8,0,0" CornerRadius="8"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header row -->
+                        <Grid Grid.Row="0" Padding="12,6"
+                              Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="55"/>
+                                <ColumnDefinition Width="30"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="95"/>
+                                <ColumnDefinition Width="75"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Proto"       FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Dir"     FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="Local"   FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="Remote"  FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="4" Text="State"   FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="5" Text="↑ Up / ↓ Down" FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="6" Text="Data"    FontSize="10" FontWeight="SemiBold" Foreground="Gray" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Connection list -->
+                        <ListView x:Name="DetailConnList" Grid.Row="1"
+                                  SelectionMode="None" MaxHeight="200">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding"                    Value="0"/>
+                                    <Setter Property="MinHeight"                  Value="0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="12,5" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="55"/>
+                                            <ColumnDefinition Width="30"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="95"/>
+                                            <ColumnDefinition Width="75"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="{Binding Protocol}"
+                                                   FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/>
+
+                                        <Border Grid.Column="1" CornerRadius="4" Padding="3,1"
+                                                HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DirectionText}" FontSize="9" FontWeight="SemiBold"
+                                                       Foreground="{Binding IsInbound, Converter={StaticResource BoolToBrushConverter}}"/>
+                                        </Border>
+
+                                        <TextBlock Grid.Column="2" Text="{Binding LocalAddressPort}"
+                                                   FontSize="11" FontFamily="Consolas"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+
+                                        <TextBlock Grid.Column="3" Text="{Binding RemoteAddressPort}"
+                                                   FontSize="11" FontFamily="Consolas"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+
+                                        <TextBlock Grid.Column="4" Text="{Binding State}"
+                                                   FontSize="10" Foreground="Gray"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+
+                                        <StackPanel Grid.Column="5" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding UploadSpeed,   Converter={StaticResource SpeedConverter}}"
+                                                       FontSize="10" Foreground="#0078D4"/>
+                                            <TextBlock Text="{Binding DownloadSpeed, Converter={StaticResource SpeedConverter}}"
+                                                       FontSize="10" Foreground="#107C10"/>
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Column="6"
+                                                   Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
+                                                   FontSize="10" Foreground="Gray" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Border>
+            </Expander>
+
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

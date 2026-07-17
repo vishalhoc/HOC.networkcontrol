@@ -1,0 +1,324 @@
+﻿<Window
+    x:Class="WinNetControl.HttpInspectorWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="HTTP Inspector"
+    Closed="Window_Closed">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Proxy Control Panel -->
+            <RowDefinition Height="Auto"/>  <!-- Toolbar -->
+            <RowDefinition Height="Auto"/>  <!-- Column headers -->
+            <RowDefinition Height="*"/>     <!-- Request list -->
+            <RowDefinition Height="Auto"/>  <!-- Status bar -->
+        </Grid.RowDefinitions>
+
+        <!-- ══ Proxy Control Panel ══ -->
+        <Border Grid.Row="0" Padding="14,10" BorderThickness="0,0,0,1"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Status indicator -->
+                <StackPanel Spacing="3" VerticalAlignment="Center">
+                    <TextBlock Text="System Proxy" FontSize="11" FontWeight="SemiBold" Foreground="Gray"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Border x:Name="ProxyDot" Width="10" Height="10" CornerRadius="5"
+                                Background="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ProxyServerText" FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" Text="Checking..."/>
+                    </StackPanel>
+                    <TextBlock x:Name="ProxyDetailText" FontSize="10" Foreground="Gray"
+                               Text="Reading proxy settings..."/>
+                </StackPanel>
+
+                <!-- Proxy control buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                            VerticalAlignment="Center">
+                    <Button x:Name="EnableProxyBtn" Padding="10,6" Click="OnEnableSystemProxy"
+                            ToolTipService.ToolTip="Set WinNetControl as the system HTTP/HTTPS proxy (port 8080). Required for HTTP traffic capture.">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE703;" FontSize="12"/>
+                            <TextBlock Text="Enable System Proxy" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="DisableProxyBtn" Padding="10,6" Click="OnDisableSystemProxy"
+                            ToolTipService.ToolTip="Remove WinNetControl as system proxy. Apps will connect directly again.">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE711;" FontSize="12"/>
+                            <TextBlock Text="Disable System Proxy" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Border Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="2,0"/>
+
+                    <!-- Emergency Fix button - always visible -->
+                    <Button x:Name="FixConnBtn" Padding="10,6" Click="OnFixConnectivity"
+                            Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                            ToolTipService.ToolTip="If apps lost internet after stopping capture, click this to force-restore the system proxy settings.">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="12"/>
+                            <TextBlock Text="Fix Connectivity" FontSize="12" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Padding="10,6" Click="OnInstallCert"
+                            ToolTipService.ToolTip="Install a trusted root certificate (required for HTTPS capture)">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE72E;" FontSize="12"/>
+                            <TextBlock Text="Install HTTPS Cert" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Apps with capture enabled -->
+                <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" MinWidth="160">
+                    <TextBlock Text="Capture enabled for:" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                    <TextBlock x:Name="CaptureAppsText" FontSize="11"
+                               Text="(none)" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                               TextWrapping="Wrap" MaxWidth="200"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══ Offline Warning Banner (hidden by default) ══ -->
+        <Border x:Name="OfflineBanner" Grid.Row="0" Padding="14,8"
+                Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                Visibility="Collapsed" VerticalAlignment="Bottom">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="2">
+                    <TextBlock Text="&#x26A0;  Apps may be offline!" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                    <TextBlock FontSize="11" Foreground="Gray" TextWrapping="Wrap"
+                               Text="The system proxy is still pointing to WinNetControl''s port but the capture is stopped. Apps using HTTP/HTTPS cannot connect. Click ''Fix Connectivity'' to restore normal internet."/>
+                </StackPanel>
+                <Button Grid.Column="1" Content="Fix Now" Click="OnFixConnectivity"
+                        Margin="12,0,0,0" Padding="14,7"
+                        Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"/>
+            </Grid>
+        </Border>
+
+        <!-- ══ Capture Toolbar ══ -->
+        <Border Grid.Row="1" Padding="12,7" BorderThickness="0,0,0,1"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button x:Name="StartBtn" Click="OnStartCapture"
+                            Style="{ThemeResource AccentButtonStyle}" Padding="10,6">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE768;" FontSize="12"/>
+                            <TextBlock Text="Start Capture" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="StopBtn" Click="OnStopCapture" Padding="10,6">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE71A;" FontSize="12"/>
+                            <TextBlock Text="Stop" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnClearRequests" Padding="10,6">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE74D;" FontSize="12"/>
+                            <TextBlock Text="Clear" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Border Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="2,0"/>
+                    <ToggleButton x:Name="AutoScrollToggle" IsChecked="True" Padding="8,5"
+                                  ToolTipService.ToolTip="Auto-scroll to latest entry">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE74B;" FontSize="12"/>
+                            <TextBlock Text="Auto-scroll" FontSize="12"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="CaptureAllToggle" IsChecked="False" Padding="8,5"
+                                  ToolTipService.ToolTip="Capture HTTP for ALL processes, not just apps with the toggle on">
+                        <TextBlock Text="Capture All" FontSize="12"/>
+                    </ToggleButton>
+                </StackPanel>
+
+                <TextBox Grid.Column="1" x:Name="FilterBox" Margin="8,0"
+                         PlaceholderText="&#xE71E;  Filter by host, method, URL or app..."
+                         TextChanged="OnFilterChanged"/>
+
+                <Button Grid.Column="2" Click="OnExportCsv" Padding="10,6"
+                        ToolTipService.ToolTip="Export visible rows to CSV on Desktop">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <FontIcon Glyph="&#xE792;" FontSize="12"/>
+                        <TextBlock Text="Export CSV" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- ══ Column Headers ══ -->
+        <Border Grid.Row="2" Padding="12,5" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="65"/>
+                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="56"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="48"/>
+                    <ColumnDefinition Width="58"/>
+                    <ColumnDefinition Width="170"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Time"       FontWeight="SemiBold" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="App"        FontWeight="SemiBold" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="Method"     FontWeight="SemiBold" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="3" Text="Host / URL" FontWeight="SemiBold" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="4" Text="Status"     FontWeight="SemiBold" FontSize="11" Foreground="Gray" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="5" Text="Size"       FontWeight="SemiBold" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="6" Text="Actions"    FontWeight="SemiBold" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- ══ Request List ══ -->
+        <ListView Grid.Row="3" x:Name="RequestsListView" SelectionMode="Single">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="12,3"/>
+                    <Setter Property="MinHeight" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnSpacing="8" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="65"/>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="56"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="48"/>
+                            <ColumnDefinition Width="58"/>
+                            <ColumnDefinition Width="170"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="{Binding TimeText}" FontSize="11"
+                                   Foreground="Gray" VerticalAlignment="Center" FontFamily="Consolas"/>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="0">
+                            <TextBlock Text="{Binding ProcessName}" FontSize="11" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{Binding ProcessName}"/>
+                            <TextBlock FontSize="10" Foreground="Gray">
+                                <Run Text="PID "/><Run Text="{Binding ProcessId}"/>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <Border Grid.Column="2" CornerRadius="4" Padding="5,2"
+                                VerticalAlignment="Center" HorizontalAlignment="Left">
+                            <Border.Background>
+                                <SolidColorBrush Color="{ThemeResource SystemAccentColor}" Opacity="0.15"/>
+                            </Border.Background>
+                            <TextBlock Text="{Binding Method}" FontSize="10" FontWeight="Bold"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Text="{Binding Host}" FontSize="11" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding Url}" FontSize="10" Foreground="Gray"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{Binding Url}"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="4" Text="{Binding StatusText}" FontSize="11"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                   FontWeight="SemiBold" FontFamily="Consolas"/>
+
+                        <TextBlock Grid.Column="5" Text="{Binding SizeText}" FontSize="11"
+                                   Foreground="Gray" VerticalAlignment="Center" FontFamily="Consolas"/>
+
+                        <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Button Padding="5,3" Click="OnBlockHost"
+                                    ToolTipService.ToolTip="Block host in Windows Hosts file (0.0.0.0 redirect)">
+                                <StackPanel Orientation="Horizontal" Spacing="3">
+                                    <FontIcon Glyph="&#xE71B;" FontSize="11"/>
+                                    <TextBlock Text="Hosts" FontSize="10"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="5,3" Click="OnBlockFirewall"
+                                    ToolTipService.ToolTip="Block host outbound in Windows Firewall (port 80+443)">
+                                <StackPanel Orientation="Horizontal" Spacing="3">
+                                    <FontIcon Glyph="&#xF140;" FontSize="11"/>
+                                    <TextBlock Text="FW" FontSize="10"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="5,3" Click="OnCopyUrl"
+                                    ToolTipService.ToolTip="Copy URL">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="12"/>
+                            </Button>
+                            <Button Padding="5,3" Click="OnOpenInBrowser"
+                                    ToolTipService.ToolTip="Open in default browser">
+                                <FontIcon Glyph="&#xE774;" FontSize="12"/>
+                            </Button>
+                        </StackPanel>
+
+                        <Grid.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Copy URL"  Click="OnCopyUrl">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Copy Host" Click="OnCopyHost">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Open in Browser" Click="OnOpenInBrowser">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE774;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutSeparator/>
+                                <MenuFlyoutItem Text="Block in Hosts File" Click="OnBlockHost">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE71B;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Block in Windows Firewall" Click="OnBlockFirewall">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xF140;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Block Both (Hosts + Firewall)" Click="OnBlockBoth">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7BA;"/></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </Grid.ContextFlyout>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- ══ Status Bar ══ -->
+        <Border Grid.Row="4" Padding="12,5" BorderThickness="0,1,0,0"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource LayerFillColorDefaultBrush}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusBar" FontSize="11" Foreground="Gray" VerticalAlignment="Center"
+                           Text="Ready  -  configure proxy above then press Start Capture"/>
+                <TextBlock x:Name="CountBar" Grid.Column="1" FontSize="11" Foreground="Gray"
+                           VerticalAlignment="Center"/>
+                <TextBlock x:Name="SizeBar"  Grid.Column="2" FontSize="11" Foreground="Gray"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

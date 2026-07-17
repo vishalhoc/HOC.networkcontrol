@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="WinNetControl.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WinNetControl"
+    xmlns:core="using:WinNetControl.Core">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Converters (app-level so all windows can use them without CS1503 in generated code) -->
+            <core:BoolToOpacityConverter             x:Key="BoolToOpacityConverter"/>
+            <core:SpeedConverter                     x:Key="SpeedConverter"/>
+            <core:SizeConverter                      x:Key="SizeConverter"/>
+            <core:BoolToVisibilityConverter          x:Key="BoolToVisibilityConverter"/>
+            <core:InverseBoolToVisibilityConverter   x:Key="InverseBoolToVisibilityConverter"/>
+            <core:BoolToBrushConverter               x:Key="BoolToBrushConverter"/>
+            <core:StateToColorConverter              x:Key="StateToColorConverter"/>
+            <core:StateToDescriptionConverter        x:Key="StateToDescriptionConverter"/>
+            <core:CountToColorConverter              x:Key="CountToColorConverter"/>
+            <core:RatioToWidthConverter              x:Key="RatioToWidthConverter"/>
+            <core:StringToBoolConverter              x:Key="StringToBoolConverter"/>
+            <core:BoolToOnOffConverter               x:Key="BoolToOnOffConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
