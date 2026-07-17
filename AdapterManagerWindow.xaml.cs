@@ -119,6 +119,93 @@ public sealed partial class AdapterManagerWindow : Window
         Refresh();
     }
 
+    private async void OnSetStaticIp(object s, RoutedEventArgs e)
+    {
+        var a = Selected; if (a == null) { Hint(); return; }
+        var ipBox  = new TextBox { Header = "IP Address",      PlaceholderText = "e.g. 192.168.1.100", Text = a.IPv4First != "" ? a.IPv4First : "" };
+        var mskBox = new TextBox { Header = "Subnet Mask",     PlaceholderText = "e.g. 255.255.255.0", Text = "255.255.255.0" };
+        var gwBox  = new TextBox { Header = "Default Gateway", PlaceholderText = "e.g. 192.168.1.1",   Text = a.Gateway != "\u2014" ? a.Gateway : "" };
+        var dlg = new ContentDialog
+        {
+            Title = $"Set Static IP \u2014 {a.Name}",
+            Content = new StackPanel { Spacing = 8, Children = { ipBox, mskBox, gwBox } },
+            PrimaryButtonText = "Apply", CloseButtonText = "Cancel",
+            XamlRoot = this.Content.XamlRoot
+        };
+        if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+        StatusBar.Text = "Setting static IP\u2026";
+        var (ok, err) = await System.Threading.Tasks.Task.Run(() =>
+            NetworkAdapterService.SetStaticIp(a.Name, ipBox.Text.Trim(),
+                mskBox.Text.Trim(), gwBox.Text.Trim()));
+        StatusBar.Text = ok ? $"\u2713  Static IP {ipBox.Text.Trim()} set on {a.Name}." : $"\u2717  {err}";
+        Refresh();
+    }
+
+    private async void OnSetDhcp(object s, RoutedEventArgs e)
+    {
+        var a = Selected; if (a == null) { Hint(); return; }
+        var dlg = new ContentDialog
+        {
+            Title = "Switch to DHCP?",
+            Content = $"'{a.Name}' will be configured to obtain IP and DNS automatically.",
+            PrimaryButtonText = "Apply", CloseButtonText = "Cancel",
+            XamlRoot = this.Content.XamlRoot
+        };
+        if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+        StatusBar.Text = "Switching to DHCP\u2026";
+        var (ok, err) = await System.Threading.Tasks.Task.Run(() =>
+            NetworkAdapterService.SetDhcp(a.Name));
+        StatusBar.Text = ok ? $"\u2713  {a.Name} now using DHCP." : $"\u2717  {err}";
+        Refresh();
+    }
+
+    private async void OnSetDns(object s, RoutedEventArgs e)
+    {
+        var a = Selected; if (a == null) { Hint(); return; }
+        // Quick DNS presets
+        var presets = new ComboBox { Header = "Quick Preset", Margin = new Thickness(0,0,0,8) };
+        presets.Items.Add("Custom");
+        presets.Items.Add("Cloudflare  1.1.1.1 / 1.0.0.1");
+        presets.Items.Add("Google      8.8.8.8 / 8.8.4.4");
+        presets.Items.Add("OpenDNS     208.67.222.222 / 208.67.220.220");
+        presets.Items.Add("Quad9       9.9.9.9 / 149.112.112.112");
+        presets.SelectedIndex = 0;
+        var p1Box = new TextBox { Header = "Primary DNS",   PlaceholderText = "e.g. 1.1.1.1" };
+        var p2Box = new TextBox { Header = "Secondary DNS", PlaceholderText = "e.g. 1.0.0.1 (optional)" };
+        presets.SelectionChanged += (_, __) =>
+        {
+            (p1Box.Text, p2Box.Text) = presets.SelectedIndex switch
+            {
+                1 => ("1.1.1.1",         "1.0.0.1"),
+                2 => ("8.8.8.8",         "8.8.4.4"),
+                3 => ("208.67.222.222",  "208.67.220.220"),
+                4 => ("9.9.9.9",         "149.112.112.112"),
+                _ => ("", "")
+            };
+        };
+        var dlg = new ContentDialog
+        {
+            Title = $"Set DNS \u2014 {a.Name}",
+            Content = new StackPanel { Spacing = 8, Children = { presets, p1Box, p2Box } },
+            PrimaryButtonText = "Apply", CloseButtonText = "Cancel",
+            XamlRoot = this.Content.XamlRoot
+        };
+        if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+        if (string.IsNullOrWhiteSpace(p1Box.Text)) { StatusBar.Text = "Primary DNS cannot be empty."; return; }
+        StatusBar.Text = "Setting DNS\u2026";
+        var (ok, err) = await System.Threading.Tasks.Task.Run(() =>
+            NetworkAdapterService.SetDns(a.Name, p1Box.Text.Trim(), p2Box.Text.Trim()));
+        StatusBar.Text = ok ? $"\u2713  DNS set to {p1Box.Text.Trim()} on {a.Name}." : $"\u2717  {err}";
+        Refresh();
+    }
+
+    private async void OnFlushDns(object s, RoutedEventArgs e)
+    {
+        StatusBar.Text = "Flushing DNS cache\u2026";
+        var (ok, output) = await System.Threading.Tasks.Task.Run(NetworkAdapterService.FlushDns);
+        StatusBar.Text = ok ? "\u2713  DNS cache flushed." : $"\u2717  {output}";
+    }
+
     private void OnDiagnoseSelected(object s, RoutedEventArgs e)
     {
         var a = Selected; if (a == null) { Hint(); return; }

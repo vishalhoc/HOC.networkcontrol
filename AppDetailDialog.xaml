@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <ContentDialog
     x:Class="WinNetControl.AppDetailDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -127,6 +127,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Text="Process Name:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
@@ -152,6 +153,12 @@
                                    FontSize="11" FontFamily="Consolas" Foreground="Gray"
                                    TextWrapping="Wrap"
                                    ToolTipService.ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+
+                        <!-- Authenticode signature (#28) -->
+                        <TextBlock Grid.Row="4" Text="Signature:" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InfoSignature" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3"
+                                   FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"
+                                   ToolTipService.ToolTip="Digital signature of the executable"/>
                     </Grid>
                 </Border>
             </Expander>

@@ -237,6 +237,48 @@ public sealed partial class HostsManagerWindow : Window
     private void OnFilterChanged(object sender, RoutedEventArgs e)      => ApplyFilter();
     private void OnHostsItemClick(object sender, ItemClickEventArgs e)  { }
 
+    // ── Backup (#31) ──────────────────────────────────────────────────────────
+    private void OnBackupHosts(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string desktop = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
+            string stamp   = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string dest    = System.IO.Path.Combine(desktop, $"hosts_backup_{stamp}.txt");
+            System.IO.File.Copy(HostsFileService.HostsPath, dest, overwrite: true);
+            ShowStatus($"✓  Backup saved → {dest}", error: false);
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Backup failed: {ex.Message}", error: true);
+        }
+    }
+
+    // ── Restore (#31) ─────────────────────────────────────────────────────────
+    private void OnRestoreHosts(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string desktop = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
+            // Pick the most-recent hosts backup from Desktop automatically
+            var backups = System.IO.Directory.GetFiles(desktop, "hosts_backup_*.txt")
+                                             .OrderByDescending(f => f).ToArray();
+            if (backups.Length == 0)
+            {
+                ShowStatus("No backup files found on Desktop (hosts_backup_*.txt).", error: true);
+                return;
+            }
+            string latest = backups[0];
+            System.IO.File.Copy(latest, HostsFileService.HostsPath, overwrite: true);
+            LoadEntries();
+            ShowStatus($"✓  Restored from: {System.IO.Path.GetFileName(latest)}", error: false);
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Restore failed: {ex.Message}", error: true);
+        }
+    }
+
     private void ShowStatus(string msg, bool error)
     {
         StatusText.Text       = msg;

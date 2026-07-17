@@ -46,6 +46,22 @@
                             <TextBlock Text="Open in Notepad" FontSize="12"/>
                         </StackPanel>
                     </Button>
+                    <!-- Backup (#31) -->
+                    <Button Click="OnBackupHosts" Padding="10,6"
+                            ToolTipService.ToolTip="Save a timestamped backup of hosts file to Desktop">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <FontIcon Glyph="&#xE792;" FontSize="12"/>
+                            <TextBlock Text="Backup" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- Restore (#31) -->
+                    <Button Click="OnRestoreHosts" Padding="10,6"
+                            ToolTipService.ToolTip="Restore hosts file from a backup on Desktop">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="12"/>
+                            <TextBlock Text="Restore Backup" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
                     <Button Click="OnResetDefault" Padding="10,6"
                             Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
                             ToolTipService.ToolTip="Restore Windows default hosts file">

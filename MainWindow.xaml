@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WinNetControl"
     xmlns:core="using:WinNetControl.Core"
+    xmlns:controls="using:WinNetControl.Controls"
     xmlns:models="using:WinNetControl.Models"
     xmlns:viewmodels="using:WinNetControl.ViewModels"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -99,6 +100,9 @@
                             <MenuFlyoutItem Text="Adapter Manager" Click="OnAdapterManagerClicked">
                                 <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE839;"/></MenuFlyoutItem.Icon>
                             </MenuFlyoutItem>
+                            <MenuFlyoutItem Text="Network Tools (Ping / Trace / Scan)" Click="OnNetworkToolsClicked">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE9CE;"/></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
                             <MenuFlyoutSeparator/>
                             <MenuFlyoutItem Text="Windows Firewall" Click="OnOpenWindowsFirewall">
                                 <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7BA;"/></MenuFlyoutItem.Icon>
@@ -111,6 +115,9 @@
                             </MenuFlyoutItem>
                             <MenuFlyoutItem Text="Network Troubleshooter" Click="OnOpenNetworkTroubleshooter">
                                 <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE9CE;"/></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutItem Text="Flush DNS Cache" Click="OnFlushDnsClicked">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;"/></MenuFlyoutItem.Icon>
                             </MenuFlyoutItem>
                             <MenuFlyoutSeparator/>
                             <MenuFlyoutItem Text="Internet Reset…" Click="OnResetInternetClicked">
@@ -133,6 +140,29 @@
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <FontIcon Glyph="&#xE7C3;" FontSize="13"/>
                         <TextBlock Text="Export" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Bulk Actions (#36) -->
+                <Button Padding="8,6" Click="OnBulkSelectAll" ToolTipService.ToolTip="Select / deselect all visible apps">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE73A;" FontSize="13"/>
+                        <TextBlock Text="Select All" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+                <Button Padding="8,6" Click="OnBulkBlock"
+                        ToolTipService.ToolTip="Block all checked apps at once"
+                        Background="#CC3300">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xF140;" FontSize="13" Foreground="White"/>
+                        <TextBlock Text="Block Selected" FontSize="12" Foreground="White"/>
+                    </StackPanel>
+                </Button>
+                <Button Padding="8,6" Click="OnBulkUnblock"
+                        ToolTipService.ToolTip="Unblock all checked apps at once">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE785;" FontSize="13"/>
+                        <TextBlock Text="Unblock Selected" FontSize="12"/>
                     </StackPanel>
                 </Button>
 
@@ -311,10 +341,18 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- App name + phantom badge + data-limit badge -->
+                                    <!-- App name + badges row -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <!-- Bulk select checkbox (#36) -->
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  VerticalAlignment="Center" Margin="0,0,2,0"
+                                                  ToolTipService.ToolTip="Select for bulk action"/>
                                         <TextBlock Text="{Binding ProcessName}" FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" MaxWidth="100"/>
+                                        <!-- Suspicious warning (#26) -->
+                                        <TextBlock Text="⚠" FontSize="11" VerticalAlignment="Center"
+                                                   Foreground="#FBBC05" ToolTipService.ToolTip="Suspicious process: no path, temp location, or random name"
+                                                   Visibility="{Binding IsSuspicious, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <Border Visibility="{Binding IsPhantom, Converter={StaticResource BoolToVisibilityConverter}}"
                                                 Background="#CC3300" CornerRadius="4" Padding="4,1">
                                             <TextBlock Text="OFFLINE" FontSize="9" Foreground="White" FontWeight="Bold"/>
@@ -322,6 +360,13 @@
                                         <Border Visibility="{Binding IsDataLimitExceeded, Converter={StaticResource BoolToVisibilityConverter}}"
                                                 Background="#8B0000" CornerRadius="4" Padding="4,1">
                                             <TextBlock Text="LIMIT" FontSize="9" Foreground="White" FontWeight="Bold"/>
+                                        </Border>
+                                        <!-- Data usage tier badge (#33) -->
+                                        <Border Visibility="{Binding DataUsageTier, Converter={StaticResource DataUsageTierToVisibilityConverter}}"
+                                                Background="{Binding DataUsageTier, Converter={StaticResource DataUsageTierToBrushConverter}}"
+                                                CornerRadius="4" Padding="4,1">
+                                            <TextBlock Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
+                                                       FontSize="9" Foreground="White" FontWeight="Bold"/>
                                         </Border>
                                     </StackPanel>
 
@@ -362,11 +407,11 @@
                                     <TextBlock Grid.Column="5" Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
                                                Foreground="Gray" FontSize="12" VerticalAlignment="Center"/>
 
-                                    <!-- Connection count badge (color changes with count) -->
-                                    <Border Grid.Column="6" CornerRadius="10" Padding="4,2" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                            Background="{Binding ConnectionCount, Converter={StaticResource CountToColorConverter}}">
-                                        <TextBlock Text="{Binding ConnectionCount}" FontSize="11" Foreground="White" HorizontalAlignment="Center"/>
-                                    </Border>
+                                    <!-- Sparkline chart (#13) -->
+                                    <controls:SparklineControl Grid.Column="6"
+                                        SpeedSamples="{Binding SpeedHistory}"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center"
+                                        ToolTipService.ToolTip="Real-time bandwidth (last 30 samples)"/>
 
                                     <!-- Widget toggle -->
                                     <ToggleButton Grid.Column="7" IsChecked="{Binding ShowFloatingWidget, Mode=TwoWay}"
@@ -427,6 +472,15 @@
                                     <MenuFlyoutItem Text="Block All" Click="OnCtxBlock">
                                         <MenuFlyoutItem.Icon><FontIcon Glyph="&#xF140;"/></MenuFlyoutItem.Icon>
                                     </MenuFlyoutItem>
+                                    <MenuFlyoutSubItem Text="Block Temporarily">
+                                        <MenuFlyoutSubItem.Icon><FontIcon Glyph="&#xE916;"/></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem Text="Block for 15 minutes"  Click="OnCtxBlockTemp" Tag="15"/>
+                                        <MenuFlyoutItem Text="Block for 30 minutes"  Click="OnCtxBlockTemp" Tag="30"/>
+                                        <MenuFlyoutItem Text="Block for 1 hour"      Click="OnCtxBlockTemp" Tag="60"/>
+                                        <MenuFlyoutItem Text="Block for 2 hours"     Click="OnCtxBlockTemp" Tag="120"/>
+                                        <MenuFlyoutItem Text="Block for 4 hours"     Click="OnCtxBlockTemp" Tag="240"/>
+                                        <MenuFlyoutItem Text="Block for Custom time" Click="OnCtxBlockTempCustom"/>
+                                    </MenuFlyoutSubItem>
                                     <MenuFlyoutItem Text="Unblock" Click="OnCtxUnblock">
                                         <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE785;"/></MenuFlyoutItem.Icon>
                                     </MenuFlyoutItem>
@@ -441,6 +495,12 @@
                                     <MenuFlyoutSeparator/>
                                     <MenuFlyoutItem Text="Kill Process" Click="OnCtxKill">
                                         <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;" Foreground="Red"/></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Text="Check on VirusTotal" Click="OnCtxVirusTotal">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B3;"/></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Text="Ping this Process Host" Click="OnCtxPingHost">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE879;"/></MenuFlyoutItem.Icon>
                                     </MenuFlyoutItem>
                                 </MenuFlyout>
                             </Expander.ContextFlyout>

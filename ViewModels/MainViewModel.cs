@@ -316,6 +316,11 @@ public partial class MainViewModel : ObservableObject
                         string snapPath = newProc.ProcessPath;
                         System.Threading.Tasks.Task.Run(() => FirewallService.BlockApp(name, snapPath, true, true));
                     }
+                    else if (!isBlocked)
+                    {
+                        // (#30) Alert: notify user about a new network process they haven't seen before
+                        ShowNewAppToast(name, newProc.ProcessPath ?? "");
+                    }
 
                     // Restore per-connection blocks
                     foreach (var c in newProc.CurrentConnections)
@@ -704,13 +709,34 @@ public partial class MainViewModel : ObservableObject
                     if (newUp   > maxUp)   maxUp   = newUp;
                     if (newDown > maxDown) maxDown = newDown;
 
-                    // Check data limit
+                    // Push sparkline sample (#13)
+                    process.PushSpeedSample(newUp + newDown);
+
+                    // Usage alert (#16) — warn at 500 MB even without a set limit
+                    if (process.TotalDataUsed > 500L * 1024 * 1024 && !process.IsDataLimitExceeded
+                        && !CurrentConfig.DataLimits.ContainsKey(process.ProcessName))
+                    {
+                        process.IsDataLimitExceeded = true;
+                        ShowDataLimitToast(process.ProcessName, process.TotalDataUsed, 500L * 1024 * 1024);
+                    }
+
+                    // Check explicit data limit
                     if (CurrentConfig.DataLimits.TryGetValue(process.ProcessName, out long limit) &&
                         limit > 0 && process.TotalDataUsed > limit && !process.IsDataLimitExceeded)
                     {
                         process.IsDataLimitExceeded = true;
-                        // Show a notification via system toast (best effort)
                         ShowDataLimitToast(process.ProcessName, process.TotalDataUsed, limit);
+                    }
+
+                    // Suspicious process detector (#26)
+                    if (!process.IsSuspicious)
+                    {
+                        bool noPath   = string.IsNullOrEmpty(process.ProcessPath);
+                        bool tempPath = process.ProcessPath?.Contains("\\Temp\\", StringComparison.OrdinalIgnoreCase) == true
+                                     || process.ProcessPath?.Contains("\\AppData\\Local\\Temp\\", StringComparison.OrdinalIgnoreCase) == true;
+                        bool randName = process.ProcessName.Length >= 8
+                                     && System.Text.RegularExpressions.Regex.IsMatch(process.ProcessName, @"^[a-z0-9]{8,}$");
+                        process.IsSuspicious = noPath || tempPath || randName;
                     }
                 }
                 else { process.UploadSpeed = 0; process.DownloadSpeed = 0; }

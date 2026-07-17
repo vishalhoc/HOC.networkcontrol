@@ -68,6 +68,34 @@
                             <TextBlock Text="Connections" FontSize="12"/>
                         </StackPanel>
                     </Button>
+                    <Button Click="OnSetStaticIp" Padding="10,6"
+                            ToolTipService.ToolTip="Set a static IP address for the selected adapter">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE703;" FontSize="13"/>
+                            <TextBlock Text="Set IP" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnSetDhcp" Padding="10,6"
+                            ToolTipService.ToolTip="Switch selected adapter to DHCP (automatic IP)">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE777;" FontSize="13"/>
+                            <TextBlock Text="Use DHCP" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnSetDns" Padding="10,6"
+                            ToolTipService.ToolTip="Set custom DNS servers for the selected adapter">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE774;" FontSize="13"/>
+                            <TextBlock Text="Set DNS" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnFlushDns" Padding="10,6"
+                            ToolTipService.ToolTip="Flush the system DNS resolver cache (ipconfig /flushdns)">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE74D;" FontSize="13"/>
+                            <TextBlock Text="Flush DNS" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <FontIcon Glyph="&#xE916;" FontSize="12" Opacity="0.5"/>
@@ -138,9 +166,21 @@
                                        TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
 
-                        <!-- Type -->
-                        <TextBlock Grid.Column="2" Text="{Binding TypeText}" FontSize="11"
-                                   VerticalAlignment="Center" Foreground="Gray"/>
+                        <!-- Type + VPN/WiFi badges -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="{Binding TypeText}" FontSize="11" Foreground="Gray"/>
+                            <!-- VPN badge (#25) -->
+                            <Border Visibility="{Binding IsVpn, Converter={StaticResource BoolToVisibilityConverter}}"
+                                    Background="#6B46C1" CornerRadius="4" Padding="5,1">
+                                <TextBlock Text="VPN" FontSize="9" Foreground="White" FontWeight="Bold"/>
+                            </Border>
+                            <!-- Wi-Fi signal bars (#24) -->
+                            <TextBlock Text="{Binding SignalBars}" FontSize="10"
+                                       FontFamily="Consolas" Foreground="#0078D4"
+                                       Visibility="{Binding IsWifi, Converter={StaticResource BoolToVisibilityConverter}}"
+                                       ToolTipService.ToolTip="Wi-Fi Signal Strength"/>
+                        </StackPanel>
 
                         <!-- Status text -->
                         <Border Grid.Column="3" CornerRadius="4" Padding="6,2"

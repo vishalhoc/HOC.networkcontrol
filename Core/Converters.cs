@@ -227,3 +227,44 @@ public class BoolToOnOffConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, string language)
         => value is string s && s == "ON";
 }
+
+/// <summary>
+/// Maps DataUsageTier (0–3) to a colored SolidColorBrush for the usage badge.
+/// 0=transparent, 1=green, 2=amber, 3=red
+/// </summary>
+public class DataUsageTierToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        int tier = value is int i ? i : 0;
+        return tier switch
+        {
+            1 => new SolidColorBrush(Color.FromArgb(255, 52, 168, 83)),   // green
+            2 => new SolidColorBrush(Color.FromArgb(255, 251, 188, 5)),   // amber
+            3 => new SolidColorBrush(Color.FromArgb(255, 234, 67, 53)),   // red
+            _ => new SolidColorBrush(Colors.Transparent)
+        };
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}
+
+/// <summary>Collapses the badge when DataUsageTier == 0 (less than 10 MB).</summary>
+public class DataUsageTierToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+        => (value is int i && i > 0) ? Visibility.Visible : Visibility.Collapsed;
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}
+
+/// <summary>Maps IsSuspicious bool to a warning foreground color.</summary>
+public class SuspiciousToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+        => (value is bool b && b)
+            ? new SolidColorBrush(Color.FromArgb(255, 251, 188, 5))
+            : new SolidColorBrush(Colors.Transparent);
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}

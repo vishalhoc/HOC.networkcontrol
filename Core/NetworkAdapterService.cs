@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -31,6 +31,9 @@ public sealed class LiveAdapterInfo : INotifyPropertyChanged
     private string _dnsServers  = "";
     private long   _bytesSent;
     private long   _bytesReceived;
+    private bool   _isVpn;
+    private bool   _isWifi;
+    private string _signalBars  = "";
 
     // Raw lists kept for copy operations (not bound)
     public List<string> IPv4 { get; set; } = new();
@@ -48,6 +51,9 @@ public sealed class LiveAdapterInfo : INotifyPropertyChanged
     public string DnsServers    { get => _dnsServers;    set => Set(ref _dnsServers, value); }
     public long   BytesSent     { get => _bytesSent;     set => Set(ref _bytesSent, value); }
     public long   BytesReceived { get => _bytesReceived; set => Set(ref _bytesReceived, value); }
+    public bool   IsVpn         { get => _isVpn;         set => Set(ref _isVpn, value); }
+    public bool   IsWifi        { get => _isWifi;        set => Set(ref _isWifi, value); }
+    public string SignalBars    { get => _signalBars;    set => Set(ref _signalBars, value); }
 
     /// <summary>Merge fresh snapshot data into this live row without replacing the object.</summary>
     public void UpdateFrom(AdapterSnapshot s)
@@ -66,6 +72,9 @@ public sealed class LiveAdapterInfo : INotifyPropertyChanged
         BytesReceived = s.BytesReceived;
         IPv4          = s.IPv4;
         IPv6          = s.IPv6;
+        IsVpn         = s.IsVpn;
+        IsWifi        = s.IsWifi;
+        SignalBars    = s.SignalBars;
     }
 }
 
@@ -83,7 +92,10 @@ public record AdapterSnapshot(
     string       Gateway,
     string       DnsServers,
     long         BytesSent,
-    long         BytesReceived
+    long         BytesReceived,
+    bool         IsVpn   = false,
+    bool         IsWifi  = false,
+    string       SignalBars = ""
 );
 
 // Keep old name as alias so existing callers compile
@@ -109,6 +121,10 @@ public static class NetworkAdapterService
     public static List<AdapterSnapshot> GetAll()
     {
         var result = new List<AdapterSnapshot>();
+
+        // Read Wi-Fi signal info once (fast netsh call)
+        var wifiSignal = GetWifiSignal();
+
         foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
         {
             try
@@ -128,6 +144,15 @@ public static class NetworkAdapterService
                 string mac = string.Join(":", ni.GetPhysicalAddress().GetAddressBytes()
                                               .Select(b => b.ToString("X2")));
 
+                // VPN detection (#25)
+                bool isVpn = ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel
+                          || ni.NetworkInterfaceType == NetworkInterfaceType.Ppp
+                          || IsVpnByDescription(ni.Description);
+
+                // Wi-Fi detection (#24)
+                bool isWifi = ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
+                string signal = isWifi ? wifiSignal : "";
+
                 result.Add(new AdapterSnapshot(
                     ni.Name, ni.Description,
                     FormatType(ni.NetworkInterfaceType),
@@ -138,13 +163,43 @@ public static class NetworkAdapterService
                     ipv4, ipv6,
                     string.IsNullOrEmpty(gw)  ? "\u2014" : gw,
                     string.IsNullOrEmpty(dns) ? "\u2014" : dns,
-                    stats.BytesSent, stats.BytesReceived
+                    stats.BytesSent, stats.BytesReceived,
+                    isVpn, isWifi, signal
                 ));
             }
             catch { }
         }
         return result.OrderByDescending(a => a.IsUp).ThenBy(a => a.Name).ToList();
     }
+
+    private static bool IsVpnByDescription(string desc)
+    {
+        string d = desc.ToLowerInvariant();
+        return d.Contains("vpn") || d.Contains("wireguard") || d.Contains("openvpn")
+            || d.Contains("tap-") || d.Contains("tun") || d.Contains("nordvpn")
+            || d.Contains("expressvpn") || d.Contains("zerotier") || d.Contains("hamachi");
+    }
+
+    // Read Wi-Fi signal via netsh (cached; one quick call per refresh)
+    private static string GetWifiSignal()
+    {
+        try
+        {
+            var (_, output) = RunCmd("netsh", "wlan show interfaces");
+            var match = System.Text.RegularExpressions.Regex.Match(
+                output, @"Signal\s*:\s*(\d+)%");
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int pct))
+            {
+                // Convert percentage to signal bars emoji
+                string bars = pct >= 80 ? "████" : pct >= 60 ? "███░" :
+                              pct >= 40 ? "██░░" : pct >= 20 ? "█░░░" : "░░░░";
+                return $"{bars} {pct}%";
+            }
+        }
+        catch { }
+        return "";
+    }
+
 
     // ── Enable / Disable ──────────────────────────────────────────────────────
     public static (bool ok, string error) Enable(string name)
@@ -167,6 +222,48 @@ public static class NetworkAdapterService
     public static void DiagnoseAdapter(string name)
         => Process.Start(new ProcessStartInfo("msdt.exe",
             "/id NetworkDiagnosticsNetworkAdapter") { UseShellExecute = true });
+
+    // ── DNS Flush ──────────────────────────────────────────────────────────────
+    public static (bool ok, string output) FlushDns()
+        => RunCmd("ipconfig", "/flushdns");
+
+    // ── Set Static IP ─────────────────────────────────────────────────────────
+    public static (bool ok, string error) SetStaticIp(
+        string adapterName, string ip, string mask, string gateway)
+    {
+        // Set IP + mask + gateway
+        var (ok1, e1) = RunNetsh(
+            $"interface ipv4 set address name=\"{adapterName}\" " +
+            $"source=static address={ip} mask={mask} gateway={gateway}");
+        return (ok1, e1);
+    }
+
+    // ── Set DHCP ──────────────────────────────────────────────────────────────
+    public static (bool ok, string error) SetDhcp(string adapterName)
+    {
+        var (ok1, e1) = RunNetsh(
+            $"interface ipv4 set address name=\"{adapterName}\" source=dhcp");
+        var (ok2, e2) = RunNetsh(
+            $"interface ipv4 set dns name=\"{adapterName}\" source=dhcp");
+        return (ok1 && ok2, ok1 ? e2 : e1);
+    }
+
+    // ── Set Custom DNS ────────────────────────────────────────────────────────
+    public static (bool ok, string error) SetDns(
+        string adapterName, string primary, string secondary = "")
+    {
+        var (ok1, e1) = RunNetsh(
+            $"interface ipv4 set dns name=\"{adapterName}\" source=static address={primary} register=primary");
+        if (!ok1) return (false, e1);
+        if (!string.IsNullOrEmpty(secondary))
+        {
+            var (ok2, e2) = RunNetsh(
+                $"interface ipv4 add dns name=\"{adapterName}\" address={secondary} index=2");
+            if (!ok2) return (false, e2);
+        }
+        return (true, "");
+    }
+
 
     // ── Private helpers ───────────────────────────────────────────────────────
     private static string FormatType(NetworkInterfaceType t) => t switch

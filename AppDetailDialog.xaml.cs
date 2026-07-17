@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using Microsoft.UI;
@@ -125,7 +125,42 @@ public sealed partial class AppDetailDialog : ContentDialog
             else InfoStartTime.Text = "—";
         }
         catch { InfoStartTime.Text = "—"; }
+
+        // Authenticode signature check (#28)
+        CheckSignature();
     }
+
+    // ── Authenticode Signature (#28) ──────────────────────────────────────────
+    private void CheckSignature()
+    {
+        string path = _process.ProcessPath ?? "";
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            if (InfoSignature != null) InfoSignature.Text = "—";
+            return;
+        }
+        try
+        {
+            var cert = System.Security.Cryptography.X509Certificates
+                             .X509Certificate.CreateFromSignedFile(path);
+            string subject = cert.Subject;
+            // Parse CN= from subject for cleaner display
+            var match = System.Text.RegularExpressions.Regex.Match(subject, @"CN=([^,]+)");
+            string signer = match.Success ? match.Groups[1].Value.Trim('"') : subject;
+            if (InfoSignature != null)
+                InfoSignature.Text = $"✓  Signed by: {signer}";
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+            if (InfoSignature != null)
+                InfoSignature.Text = "⚠  Not signed or signature invalid";
+        }
+        catch
+        {
+            if (InfoSignature != null) InfoSignature.Text = "—";
+        }
+    }
+
 
     // ── App icon (loads from exe via BitmapImage) ─────────────────────────────
     private void LoadAppIcon()

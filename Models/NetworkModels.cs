@@ -100,7 +100,15 @@ public partial class ProcessNetworkInfo : ObservableObject
     public  double DownloadSpeed { get => _downloadSpeed; set { if (SetProperty(ref _downloadSpeed, System.Math.Round(value, 1))) OnPropertyChanged(nameof(DownloadSpeedRatio)); } }
 
     private long _totalDataUsed;
-    public  long TotalDataUsed   { get => _totalDataUsed;  set => SetProperty(ref _totalDataUsed, value); }
+    public  long TotalDataUsed
+    {
+        get => _totalDataUsed;
+        set
+        {
+            if (SetProperty(ref _totalDataUsed, value))
+                OnPropertyChanged(nameof(DataUsageTier));
+        }
+    }
 
     // Speed ratios relative to the global max — set externally by ViewModel each update cycle
     private double _maxUploadKbps  = 1;
@@ -142,6 +150,35 @@ public partial class ProcessNetworkInfo : ObservableObject
     public System.Collections.Generic.List<ProcessConnection> CurrentConnections { get; set; } = new();
 
     public int ConnectionCount => Connections.Count;
+
+    // ── Sparkline history (#13) ───────────────────────────────────────────────
+    // Rolling 30-point window of combined (upload+download) KB/s readings
+    private readonly double[] _speedHistory = new double[30];
+    private int _speedHistoryIdx;
+    public System.Collections.Generic.IReadOnlyList<double> SpeedHistory => _speedHistory;
+
+    public void PushSpeedSample(double combinedKbps)
+    {
+        _speedHistory[_speedHistoryIdx % 30] = combinedKbps;
+        _speedHistoryIdx++;
+        OnPropertyChanged(nameof(SpeedHistory));
+    }
+
+    // ── Suspicious flag (#26) ─────────────────────────────────────────────────
+    private bool _isSuspicious;
+    public  bool IsSuspicious { get => _isSuspicious; set => SetProperty(ref _isSuspicious, value); }
+
+    // ── Bulk-select checkbox (#36) ────────────────────────────────────────────
+    private bool _isSelected;
+    public  bool IsSelected   { get => _isSelected;   set => SetProperty(ref _isSelected, value); }
+
+    // ── Data usage tier for badge color (#33) ────────────────────────────────
+    /// <summary>0=none, 1=low(green), 2=medium(yellow), 3=high(red)</summary>
+    public int DataUsageTier =>
+        TotalDataUsed < 1024L * 1024 * 10           ? 0 :   // < 10 MB → no badge
+        TotalDataUsed < 1024L * 1024 * 100          ? 1 :   // 10–100 MB → green
+        TotalDataUsed < 1024L * 1024 * 1024         ? 2 :   // 100 MB–1 GB → yellow
+        3;                                                   // > 1 GB → red
 
     public ProcessNetworkInfo()
     {

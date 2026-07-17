@@ -1,9 +1,11 @@
 using Microsoft.UI.Xaml;
+using WinNetControl.Core;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using WinNetControl.ViewModels;
 using WinNetControl.Models;
 using WinUIEx;
+using System.Linq;
 using System;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -66,11 +68,51 @@ public sealed partial class MainWindow : Window
             _searchDebounce.Stop();
             ViewModel.SearchText = SearchBox.Text;
         };
+
+        // System tray icon
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _tray = new TrayService(App.WindowHandle, this.DispatcherQueue);
+                _tray.SetTooltipProvider(() =>
+                {
+                    string up   = ViewModel.GlobalUploadText;
+                    string down = ViewModel.GlobalDownloadText;
+                    return $"WinNetControl  \u2191{up}  \u2193{down}";
+                });
+            }
+            catch { }
+        });
+
+        // Keyboard shortcuts
+        if (this.Content is FrameworkElement root)
+            root.KeyDown += OnGlobalKeyDown;
     }
+
+    private TrayService? _tray;
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         try { ViewModel.ProxyService.Stop(); } catch { }
+        try { _tray?.Dispose(); _tray = null; } catch { }
+    }
+
+    // ── DNS Flush ─────────────────────────────────────────────────────────────
+    private async void OnFlushDnsClicked(object sender, RoutedEventArgs e)
+    {
+        var (ok, output) = await System.Threading.Tasks.Task.Run(
+            () => NetworkAdapterService.FlushDns());
+        var dlg = new ContentDialog
+        {
+            Title           = ok ? "✓  DNS Cache Flushed" : "✗  DNS Flush Failed",
+            Content         = ok
+                ? "DNS resolver cache has been cleared. New lookups will use fresh DNS results."
+                : $"Error: {output}",
+            CloseButtonText = "OK",
+            XamlRoot        = this.Content.XamlRoot
+        };
+        await dlg.ShowAsync();
     }
 
     // ── Theme ─────────────────────────────────────────────────────────────────
@@ -298,16 +340,51 @@ public sealed partial class MainWindow : Window
     }
 
     // ── Adapter Manager ───────────────────────────────────────────────────────
-    private AdapterManagerWindow? _adapterManagerWindow;
+    private AdapterManagerWindow? _adapterWindow;
     private void OnAdapterManagerClicked(object sender, RoutedEventArgs e)
     {
-        if (_adapterManagerWindow != null)
+        if (_adapterWindow != null)
         {
-            try { _adapterManagerWindow.Activate(); return; } catch { }
+            try { _adapterWindow.Activate(); return; } catch { }
         }
-        _adapterManagerWindow = new AdapterManagerWindow();
-        _adapterManagerWindow.Closed += (_, __) => _adapterManagerWindow = null;
-        _adapterManagerWindow.Activate();
+        _adapterWindow = new AdapterManagerWindow();
+        _adapterWindow.Closed += (_, __) => _adapterWindow = null;
+        _adapterWindow.Activate();
+    }
+
+    // ── Bulk Select & Block (#36) ─────────────────────────────────────────────
+    private bool _allSelected;
+    private void OnBulkSelectAll(object sender, RoutedEventArgs e)
+    {
+        _allSelected = !_allSelected;
+        foreach (var p in ViewModel.FilteredProcesses)
+            p.IsSelected = _allSelected;
+    }
+
+    private void OnBulkBlock(object sender, RoutedEventArgs e)
+    {
+        var targets = ViewModel.FilteredProcesses.Where(p => p.IsSelected).ToList();
+        foreach (var p in targets)
+        {
+            if (!p.IsBlocked)
+            {
+                p.IsBlocked = true;
+                ViewModel.ToggleBlock(p);
+            }
+        }
+    }
+
+    private void OnBulkUnblock(object sender, RoutedEventArgs e)
+    {
+        var targets = ViewModel.FilteredProcesses.Where(p => p.IsSelected).ToList();
+        foreach (var p in targets)
+        {
+            if (p.IsBlocked)
+            {
+                p.IsBlocked = false;
+                ViewModel.ToggleBlock(p);
+            }
+        }
     }
 
     // ── Process Right-Click Context Menu ─────────────────────────────────────
@@ -541,3 +618,152 @@ public sealed partial class MainWindow : Window
     }
 }
 
+// Temporary-block helper lives here so it can access the timer dict inline
+partial class MainWindow
+{
+    // ── Network Tools window ──────────────────────────────────────────────────
+    private NetworkToolsWindow? _netToolsWindow;
+    private void OnNetworkToolsClicked(object sender, RoutedEventArgs e)
+    {
+        if (_netToolsWindow != null)
+        {
+            try { _netToolsWindow.Activate(); return; } catch { }
+        }
+        _netToolsWindow = new NetworkToolsWindow();
+        _netToolsWindow.Closed += (_, __) => _netToolsWindow = null;
+        _netToolsWindow.Activate();
+    }
+
+    // ── Temporary Block (#3) ──────────────────────────────────────────────────
+    private readonly System.Collections.Generic.Dictionary<int, DispatcherTimer> _tempBlockTimers = new();
+
+    private void OnCtxBlockTemp(object sender, RoutedEventArgs e)
+    {
+        if (_ctxProcess == null) return;
+        if (sender is not MenuFlyoutItem item) return;
+        int minutes = int.TryParse(item.Tag?.ToString(), out int m) ? m : 30;
+        StartTempBlock(_ctxProcess, minutes);
+    }
+
+    private async void OnCtxBlockTempCustom(object sender, RoutedEventArgs e)
+    {
+        if (_ctxProcess == null) return;
+        var box = new NumberBox { Header = "Block duration (minutes)", Value = 30, Minimum = 1, Maximum = 1440 };
+        var dlg = new ContentDialog
+        {
+            Title = $"Block '{_ctxProcess.ProcessName}' temporarily",
+            Content = box,
+            PrimaryButtonText = "Block",
+            CloseButtonText   = "Cancel",
+            XamlRoot = this.Content.XamlRoot
+        };
+        if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+        StartTempBlock(_ctxProcess, (int)box.Value);
+    }
+
+    private void StartTempBlock(Models.ProcessNetworkInfo process, int minutes)
+    {
+        // Cancel any existing timer for this process
+        if (_tempBlockTimers.TryGetValue(process.ProcessId, out var old))
+        {
+            old.Stop();
+            _tempBlockTimers.Remove(process.ProcessId);
+        }
+
+        // Block now
+        if (!process.IsBlocked)
+        {
+            process.IsBlocked = true;
+            ViewModel.ToggleBlock(process);
+        }
+
+        // Auto-unblock after 'minutes'
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(minutes) };
+        timer.Tick += (_, __) =>
+        {
+            timer.Stop();
+            _tempBlockTimers.Remove(process.ProcessId);
+            process.IsBlocked = false;
+            ViewModel.ToggleBlock(process);
+        };
+        _tempBlockTimers[process.ProcessId] = timer;
+        timer.Start();
+    }
+
+    // ── VirusTotal lookup (#27) ───────────────────────────────────────────────
+    private void OnCtxVirusTotal(object sender, RoutedEventArgs e)
+    {
+        if (_ctxProcess == null) return;
+        string path = _ctxProcess.ProcessPath ?? "";
+        if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+        {
+            // Compute SHA-256 and open VirusTotal search
+            try
+            {
+                using var sha = System.Security.Cryptography.SHA256.Create();
+                using var fs  = System.IO.File.OpenRead(path);
+                byte[] hash   = sha.ComputeHash(fs);
+                string hex    = BitConverter.ToString(hash).Replace("-", "").ToLower();
+                string url    = $"https://www.virustotal.com/gui/file/{hex}";
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+                return;
+            }
+            catch { }
+        }
+        // Fallback: search by process name
+        string nameUrl = $"https://www.virustotal.com/gui/search/{Uri.EscapeDataString(_ctxProcess.ProcessName)}";
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(nameUrl) { UseShellExecute = true });
+    }
+
+    // ── Ping selected process host (#22) ─────────────────────────────────────
+    private void OnCtxPingHost(object sender, RoutedEventArgs e)
+    {
+        if (_ctxProcess == null) return;
+        // Pick first remote connection address
+        string? host = _ctxProcess.Connections.FirstOrDefault()?.RemoteAddress;
+        if (string.IsNullOrEmpty(host) || host == "*") host = _ctxProcess.ProcessName;
+
+        if (_netToolsWindow == null)
+        {
+            _netToolsWindow = new NetworkToolsWindow();
+            _netToolsWindow.Closed += (_, __) => _netToolsWindow = null;
+        }
+        _netToolsWindow.Activate();
+        // Pre-fill ping host via public API
+        try { _netToolsWindow.SetPingHost(host); } catch { }
+    }
+
+    // ── Keyboard shortcuts (#35) ─────────────────────────────────────────────
+    private void OnGlobalKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        bool ctrl = Microsoft.UI.Input.InputKeyboardSource
+                              .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control)
+                              .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+        switch (e.Key)
+        {
+            case Windows.System.VirtualKey.F5:
+                ViewModel.ApplyFilterAndSort();
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.F when ctrl:
+                SearchBox.Focus(FocusState.Keyboard);
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.E when ctrl:
+                OnExportCsvClicked(this, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.Delete when _ctxProcess != null:
+                if (!_ctxProcess.IsBlocked)
+                {
+                    _ctxProcess.IsBlocked = true;
+                    ViewModel.ToggleBlock(_ctxProcess);
+                }
+                e.Handled = true;
+                break;
+        }
+    }
+}
