@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Net;
 using System.Security.Principal;
@@ -307,5 +307,84 @@ public static class FirewallService
                 { UseShellExecute = true });
         }
         catch { }
+    }
+
+    // ── Rule Export / Import (#4 / #37) ──────────────────────────────────────
+
+    /// <summary>
+    /// Exports current netsh advfirewall rules whose name starts with the
+    /// WinNetControl prefix to a JSON file on the Desktop.
+    /// Returns the path written, or null on error.
+    /// </summary>
+    public static string? ExportRules(System.Collections.Generic.IEnumerable<WinNetControl.Models.ProcessNetworkInfo> configs)
+    {
+        try
+        {
+            // Collect all blocked entries
+            var entries = configs
+                .Where(c => c.IsBlocked && !string.IsNullOrEmpty(c.ProcessPath))
+                .Select(c => new RuleExportEntry
+                {
+                    Name         = c.ProcessName,
+                    Path         = c.ProcessPath,
+                    BlockInbound = c.BlockInbound,
+                    BlockOutbound= c.BlockOutbound,
+                    DataLimitMb  = c.DataLimitMb,
+                    Notes        = c.Notes
+                }).ToList();
+
+            string json   = System.Text.Json.JsonSerializer.Serialize(entries,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string path    = System.IO.Path.Combine(desktop,
+                $"WinNetControl_Rules_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+            System.IO.File.WriteAllText(path, json);
+            return path;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Imports rules from a JSON file. Returns count of rules applied, or -1 on error.
+    /// </summary>
+    public static int ImportRules(string filePath,
+        System.Action<WinNetControl.Models.ProcessNetworkInfo> onEachRule)
+    {
+        try
+        {
+            string json    = System.IO.File.ReadAllText(filePath);
+            var    entries = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<RuleExportEntry>>(json);
+            if (entries == null) return 0;
+
+            int count = 0;
+            foreach (var e in entries)
+            {
+                if (string.IsNullOrEmpty(e.Path)) continue;
+                BlockApp(e.Name, e.Path, e.BlockInbound, e.BlockOutbound);
+                onEachRule(new WinNetControl.Models.ProcessNetworkInfo
+                {
+                    ProcessName   = e.Name,
+                    ProcessPath   = e.Path,
+                    IsBlocked     = true,
+                    BlockInbound  = e.BlockInbound,
+                    BlockOutbound = e.BlockOutbound,
+                    DataLimitMb   = e.DataLimitMb,
+                    Notes         = e.Notes
+                });
+                count++;
+            }
+            return count;
+        }
+        catch { return -1; }
+    }
+
+    private sealed class RuleExportEntry
+    {
+        public string Name          { get; set; } = "";
+        public string Path          { get; set; } = "";
+        public bool   BlockInbound  { get; set; } = true;
+        public bool   BlockOutbound { get; set; } = true;
+        public double DataLimitMb   { get; set; }
+        public string Notes         { get; set; } = "";
     }
 }

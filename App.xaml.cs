@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace WinNetControl;
 
@@ -32,9 +34,42 @@ public partial class App : Application
     private static readonly string CrashLog = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "WinNetControl_crash.log");
 
-    /// <summary>
-    /// Initializes the singleton application object.
-    /// </summary>
+    // ── Single-instance enforcement ──────────────────────────────────────────
+    private static Mutex? _instanceMutex;
+
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint hWnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint FindWindow(string? lpClassName, string lpWindowName);
+    private const int SW_RESTORE = 9;
+
+    /// <summary>Returns false if another instance is already running (caller should exit).</summary>
+    public static bool EnsureSingleInstance()
+    {
+        _instanceMutex = new Mutex(true, "WinNetControl_SingleInstance_v2", out bool createdNew);
+        if (!createdNew)
+        {
+            // Another instance exists — bring it to front
+            nint hwnd = FindWindow(null, "WinNetControl");
+            if (hwnd == nint.Zero)
+            {
+                // Try partial match via process
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName("WinNetControl"))
+                {
+                    if (p.MainWindowHandle != nint.Zero) { hwnd = p.MainWindowHandle; break; }
+                }
+            }
+            if (hwnd != nint.Zero)
+            {
+                ShowWindow(hwnd, SW_RESTORE);
+                SetForegroundWindow(hwnd);
+            }
+            return false;  // signal: do not continue
+        }
+        return true;
+    }
+
+    /// <inheritdoc />
     public App()
     {
         // Global unhandled exception handlers
@@ -65,6 +100,13 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        // Single instance guard — if already running, focus existing window and exit
+        if (!EnsureSingleInstance())
+        {
+            this.Exit();
+            return;
+        }
+
         try
         {
             Window = new MainWindow();

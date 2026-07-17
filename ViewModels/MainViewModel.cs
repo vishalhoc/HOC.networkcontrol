@@ -88,7 +88,8 @@ public partial class MainViewModel : ObservableObject
                     IsBlocked   = true,
                     IsPhantom   = true,
                     BlockInbound  = CurrentConfig.BlockedAppsInbound.Contains(name),
-                    BlockOutbound = CurrentConfig.BlockedAppsOutbound.Contains(name)
+                    BlockOutbound = CurrentConfig.BlockedAppsOutbound.Contains(name),
+                    Notes         = CurrentConfig.AppNotes.TryGetValue(name, out string? notes) ? notes : string.Empty
                 };
                 if (!phantom.BlockInbound && !phantom.BlockOutbound)
                 {
@@ -199,6 +200,17 @@ public partial class MainViewModel : ObservableObject
                 ApplyFilterAndSort();
             }
         }
+    }
+
+    // ── Protocol filter (#9) ──────────────────────────────────────────────────
+    public ObservableCollection<string> ProtocolFilters { get; } = new()
+        { "All Proto", "TCP only", "UDP only", "Has TCP+UDP" };
+
+    private string _selectedProtocol = "All Proto";
+    public string SelectedProtocol
+    {
+        get => _selectedProtocol;
+        set { if (SetProperty(ref _selectedProtocol, value)) ApplyFilterAndSort(); }
     }
 
     // ── Startup with Windows ──────────────────────────────────────────────────
@@ -349,6 +361,9 @@ public partial class MainViewModel : ObservableObject
                         string.Equals(p.ProcessName, name, StringComparison.OrdinalIgnoreCase));
                     if (phantom != null) Processes.Remove(phantom);
 
+                    if (CurrentConfig.AppNotes.TryGetValue(name, out string? appNotes))
+                        newProc.Notes = appNotes;
+
                     Processes.Add(newProc);
 
                     // Re-apply firewall rule off the UI thread
@@ -392,6 +407,17 @@ public partial class MainViewModel : ObservableObject
             query = query.Where(p => p.IsPhantom);
         else if (SelectedFilter != "All")
             query = query.Where(p => p.AppType == SelectedFilter);
+
+        // Protocol filter (#9)
+        if (SelectedProtocol == "TCP only")
+            query = query.Where(p => p.Connections.Any(c => c.Protocol.StartsWith("TCP", StringComparison.OrdinalIgnoreCase))
+                                  && !p.Connections.Any(c => c.Protocol.StartsWith("UDP", StringComparison.OrdinalIgnoreCase)));
+        else if (SelectedProtocol == "UDP only")
+            query = query.Where(p => p.Connections.Any(c => c.Protocol.StartsWith("UDP", StringComparison.OrdinalIgnoreCase))
+                                  && !p.Connections.Any(c => c.Protocol.StartsWith("TCP", StringComparison.OrdinalIgnoreCase)));
+        else if (SelectedProtocol == "Has TCP+UDP")
+            query = query.Where(p => p.Connections.Any(c => c.Protocol.StartsWith("TCP", StringComparison.OrdinalIgnoreCase))
+                                  && p.Connections.Any(c => c.Protocol.StartsWith("UDP", StringComparison.OrdinalIgnoreCase)));
 
         IOrderedEnumerable<ProcessNetworkInfo> orderedQuery = SelectedSort switch
         {

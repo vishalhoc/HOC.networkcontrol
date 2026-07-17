@@ -57,4 +57,7 @@ public class AppConfig
 
     // Per-process data limits in bytes (0 = no limit)
     public Dictionary<string, long> DataLimits { get; set; } = new();
+
+    // Per-app user notes (#11)
+    public Dictionary<string, string> AppNotes { get; set; } = new();
 }

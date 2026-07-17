@@ -14,34 +14,24 @@
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>  <!-- Row 0: Action toolbar -->
+            <RowDefinition Height="Auto"/>  <!-- Row 1: Filter / Sort / Search -->
+            <RowDefinition Height="Auto"/>  <!-- Row 2: Stats bar -->
+            <RowDefinition Height="*"/>     <!-- Row 3: Process list -->
         </Grid.RowDefinitions>
 
         <!-- ══════════════════════════════════════════════════════
              ROW 0 — Toolbar
              ══════════════════════════════════════════════════════ -->
-        <Grid Grid.Row="0" Padding="12,6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+        <!-- ══ ROW 0 — Action Toolbar ══ -->
+        <Grid Grid.Row="0" Padding="10,5" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left: filter / sort / search -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                <ComboBox Header="Filter" ItemsSource="{x:Bind ViewModel.Filters}"
-                          SelectedItem="{x:Bind ViewModel.SelectedFilter, Mode=TwoWay}" Width="145"/>
-                <ComboBox Header="Sort By" ItemsSource="{x:Bind ViewModel.SortOptions}"
-                          SelectedItem="{x:Bind ViewModel.SelectedSort, Mode=TwoWay}" Width="160"/>
-                <TextBox x:Name="SearchBox" Header="Search" PlaceholderText="Process name…" Width="150"
-                         TextChanged="OnSearchTextChanged"/>
-            </StackPanel>
-
-            <!-- Center: app name + version -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                        HorizontalAlignment="Center" VerticalAlignment="Center">
+            <!-- Left: app title -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                 <FontIcon Glyph="&#xE774;" FontSize="16"
                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                 <TextBlock x:Name="AppTitleText"
@@ -52,7 +42,7 @@
             </StackPanel>
 
             <!-- Right: action buttons -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
 
                 <!-- Block New Apps global toggle -->
                 <ToggleButton IsChecked="{x:Bind ViewModel.BlockNewApps, Mode=TwoWay}"
@@ -118,6 +108,10 @@
                             </MenuFlyoutItem>
                             <MenuFlyoutItem Text="Flush DNS Cache" Click="OnFlushDnsClicked">
                                 <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;"/></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutSeparator/>
+                            <MenuFlyoutItem Text="Local Network Scanner" Click="OnLocalScannerClicked">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE968;"/></MenuFlyoutItem.Icon>
                             </MenuFlyoutItem>
                             <MenuFlyoutSeparator/>
                             <MenuFlyoutItem Text="Internet Reset…" Click="OnResetInternetClicked">
@@ -193,13 +187,106 @@
                 <Button Padding="8,6" Click="OnHttpInspectorClicked" ToolTipService.ToolTip="HTTP Inspector">
                     <FontIcon Glyph="&#xE72C;" FontSize="16"/>
                 </Button>
+
+                <!-- Export Rules (#4/#37) -->
+                <Button Padding="8,6" Click="OnExportRulesClicked"
+                        ToolTipService.ToolTip="Export all WinNetControl firewall rules to Desktop">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xEDE1;" FontSize="13"/>
+                        <TextBlock Text="Export Rules" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Import Rules (#4/#37) -->
+                <Button Padding="8,6" Click="OnImportRulesClicked"
+                        ToolTipService.ToolTip="Import WinNetControl firewall rules from Desktop backup">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE896;" FontSize="13"/>
+                        <TextBlock Text="Import Rules" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Minimize to Tray (#40) -->
+                <Button Padding="8,6" Click="OnMinimizeToTrayClicked"
+                        ToolTipService.ToolTip="Minimize to system tray">
+                    <FontIcon Glyph="&#xE921;" FontSize="14"/>
+                </Button>
             </StackPanel>
         </Grid>
 
+        <!-- ══ ROW 1 — Filter / Sort / Search / Protocol bar ══ -->
+        <Border Grid.Row="1" Padding="12,6,12,6"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+
+                <!-- Filter -->
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE71C;" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                    <TextBlock Text="Filter:" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{x:Bind ViewModel.Filters}"
+                              SelectedItem="{x:Bind ViewModel.SelectedFilter, Mode=TwoWay}"
+                              Width="140" Height="32"/>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Rectangle Width="1" Height="22" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+
+                <!-- Sort By -->
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE8CB;" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                    <TextBlock Text="Sort:" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{x:Bind ViewModel.SortOptions}"
+                              SelectedItem="{x:Bind ViewModel.SelectedSort, Mode=TwoWay}"
+                              Width="170" Height="32"/>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Rectangle Width="1" Height="22" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+
+                <!-- Search -->
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE721;" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                    <AutoSuggestBox x:Name="SearchBox"
+                                    PlaceholderText="Search process name…"
+                                    Width="200" Height="32"
+                                    QueryIcon="Find"
+                                    TextChanged="OnSearchTextChanged_Auto"/>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Rectangle Width="1" Height="22" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+
+                <!-- Protocol -->
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE839;" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                    <TextBlock Text="Protocol:" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{x:Bind ViewModel.ProtocolFilters}"
+                              SelectedItem="{x:Bind ViewModel.SelectedProtocol, Mode=TwoWay}"
+                              Width="110" Height="32"/>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Rectangle Width="1" Height="22" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+
+                <!-- Quick clear search button -->
+                <Button Padding="6,4" VerticalAlignment="Center"
+                        Click="OnClearSearchClicked"
+                        ToolTipService.ToolTip="Clear filters">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE894;" FontSize="12"/>
+                        <TextBlock Text="Clear" FontSize="11"/>
+                    </StackPanel>
+                </Button>
+
+            </StackPanel>
+        </Border>
+
         <!-- ══════════════════════════════════════════════════════
-             ROW 1 — Global Stats Bar
+             ROW 2 — Global Stats Bar
              ══════════════════════════════════════════════════════ -->
-        <Border Grid.Row="1" Margin="12,4,12,4" Padding="14,8"
+        <Border Grid.Row="2" Margin="12,4,12,4" Padding="14,8"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -313,9 +400,9 @@
         </Border>
 
         <!-- ══════════════════════════════════════════════════════
-             ROW 2 — Process List
+             ROW 3 — Process List
              ══════════════════════════════════════════════════════ -->
-        <Grid Grid.Row="2" Margin="12,0,12,8">
+        <Grid Grid.Row="3" Margin="12,0,12,8">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -339,12 +426,21 @@
                     <ColumnDefinition Width="*"/>   <!-- block all -->
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0"  Text="☑"           FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center" ToolTipService.ToolTip="Bulk select"/>
-                <TextBlock Grid.Column="1"  Text="Application"  FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <!-- Sortable headers use Tag=exact SortOptions string; cursor hand gives visual cue -->
+                <TextBlock Grid.Column="1"  Text="Application ↕" Tag="Name (A-Z)"
+                           FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontSize="11" VerticalAlignment="Center"
+                           Tapped="OnSortHeaderTapped" ToolTipService.ToolTip="Click to sort by Name"/>
                 <TextBlock Grid.Column="2"  Text="Adapter"      FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="3"  Text="Type"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="4"  Text="↑ Upload"     FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="5"  Text="↓ Download"   FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="6"  Text="Data"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="4"  Text="↑ Upload ↕"  Tag="Upload Speed"
+                           FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontSize="11" VerticalAlignment="Center"
+                           Tapped="OnSortHeaderTapped" ToolTipService.ToolTip="Click to sort by Upload Speed"/>
+                <TextBlock Grid.Column="5"  Text="↓ Download ↕" Tag="Download Speed"
+                           FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontSize="11" VerticalAlignment="Center"
+                           Tapped="OnSortHeaderTapped" ToolTipService.ToolTip="Click to sort by Download Speed"/>
+                <TextBlock Grid.Column="6"  Text="Data ↕"       Tag="Data Used (High-Low)"
+                           FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontSize="11" VerticalAlignment="Center"
+                           Tapped="OnSortHeaderTapped" ToolTipService.ToolTip="Click to sort by Data Used"/>
                 <TextBlock Grid.Column="7"  Text="Graph"        FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="8"  Text="Widget"       FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="9"  Text="Blk In/Out"   FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
@@ -561,6 +657,13 @@
                                     <MenuFlyoutItem Text="Ping this Process Host" Click="OnCtxPingHost">
                                         <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE879;"/></MenuFlyoutItem.Icon>
                                     </MenuFlyoutItem>
+                                    <MenuFlyoutSeparator/>
+                                    <MenuFlyoutItem Text="Network Map" Click="OnCtxNetworkMap">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8EF;"/></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Text="Details…" Click="OnCtxDetails">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;"/></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
                                 </MenuFlyout>
                             </Expander.ContextFlyout>
 
@@ -710,6 +813,13 @@
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
                                     </ListView>
+
+                                    <!-- App Notes (#11) -->
+                                    <TextBox Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="Add custom notes or context for this application..."
+                                             FontSize="11"
+                                             Margin="0,4,0,0"
+                                             LostFocus="OnAppNotesLostFocus"/>
                                 </StackPanel>
                             </Expander.Content>
                         </Expander>

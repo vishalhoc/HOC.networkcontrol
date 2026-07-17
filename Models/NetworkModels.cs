@@ -183,6 +183,14 @@ public partial class ProcessNetworkInfo : ObservableObject
         TotalDataUsed < 1024L * 1024 * 1024         ? 2 :   // 100 MB–1 GB → yellow
         3;                                                   // > 1 GB → red
 
+    // ── App Notes (#11) — user-editable annotation, persisted via AppConfig ───
+    private string _notes = string.Empty;
+    public  string Notes { get => _notes; set => SetProperty(ref _notes, value); }
+
+    // ── Data limit in MB (#16) — 0 = no limit ────────────────────────────────
+    private double _dataLimitMb;
+    public  double DataLimitMb { get => _dataLimitMb; set => SetProperty(ref _dataLimitMb, value); }
+
     public ProcessNetworkInfo()
     {
         Connections.CollectionChanged += (s, e) => OnPropertyChanged(nameof(ConnectionCount));

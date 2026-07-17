@@ -62,7 +62,7 @@ public sealed partial class MainWindow : Window
         // Apply saved theme
         ApplyTheme(ViewModel.CurrentConfig.AppTheme);
 
-        // Wire up search debounce
+        // Wire up search debounce — works for both TextBox and AutoSuggestBox
         _searchDebounce.Tick += (s, e) =>
         {
             _searchDebounce.Stop();
@@ -280,12 +280,28 @@ public sealed partial class MainWindow : Window
         w.Activate();
     }
 
-    // ── Search (debounced) ────────────────────────────────────────────────────
+    // ── Search (debounced) — TextBox fallback ────────────────────────────────
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
     {
-        // Restart debounce timer on every keystroke
         _searchDebounce.Stop();
         _searchDebounce.Start();
+    }
+
+    // ── Search (debounced) — AutoSuggestBox ───────────────────────────────────
+    private void OnSearchTextChanged_Auto(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    {
+        _searchDebounce.Stop();
+        _searchDebounce.Start();
+    }
+
+    // ── Clear Filters ─────────────────────────────────────────────────────────
+    private void OnClearSearchClicked(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Text = string.Empty;
+        ViewModel.SearchText      = string.Empty;
+        ViewModel.SelectedFilter  = "All";
+        ViewModel.SelectedSort    = "Data Used (High-Low)";
+        ViewModel.SelectedProtocol = "All Proto";
     }
 
     // ── Reset Data ────────────────────────────────────────────────────────────
@@ -723,18 +739,35 @@ partial class MainWindow
     private void OnCtxPingHost(object sender, RoutedEventArgs e)
     {
         if (_ctxProcess == null) return;
-        // Pick first remote connection address
         string? host = _ctxProcess.Connections.FirstOrDefault()?.RemoteAddress;
         if (string.IsNullOrEmpty(host) || host == "*") host = _ctxProcess.ProcessName;
-
         if (_netToolsWindow == null)
         {
             _netToolsWindow = new NetworkToolsWindow();
             _netToolsWindow.Closed += (_, __) => _netToolsWindow = null;
         }
         _netToolsWindow.Activate();
-        // Pre-fill ping host via public API
         try { _netToolsWindow.SetPingHost(host); } catch { }
+    }
+
+    // ── Local Network Scanner ─────────────────────────────────────────────────
+    private LocalNetworkScannerWindow? _localScannerWindow;
+    private void OnLocalScannerClicked(object sender, RoutedEventArgs e)
+    {
+        if (_localScannerWindow == null)
+        {
+            _localScannerWindow = new LocalNetworkScannerWindow();
+            _localScannerWindow.Closed += (_, __) => _localScannerWindow = null;
+        }
+        _localScannerWindow.Activate();
+    }
+
+    // ── Network Map ───────────────────────────────────────────────────────────
+    private void OnCtxNetworkMap(object sender, RoutedEventArgs e)
+    {
+        if (_ctxProcess == null) return;
+        var mapWindow = new NetworkMapWindow(_ctxProcess);
+        mapWindow.Activate();
     }
 
     // ── Keyboard shortcuts (#35) ─────────────────────────────────────────────
@@ -768,6 +801,105 @@ partial class MainWindow
                 }
                 e.Handled = true;
                 break;
+        }
+    }
+
+    // ── Export / Import Rules (#4 / #37) ─────────────────────────────────────
+    private async void ShowMessage(string title, string message)
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = this.Content.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch { }
+    }
+
+    private void OnExportRulesClicked(object sender, RoutedEventArgs e)
+    {
+        string? path = FirewallService.ExportRules(ViewModel.Processes);
+        if (path != null)
+        {
+            ShowMessage("Rules Exported", $"Firewall rules backed up to:\n{path}");
+        }
+        else
+        {
+            ShowMessage("Export Failed", "Could not export firewall rules. Check permissions.");
+        }
+    }
+
+    private async void OnImportRulesClicked(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        picker.ViewMode = Windows.Storage.Pickers.PickerViewMode.List;
+        picker.FileTypeFilter.Add(".json");
+
+        var file = await picker.PickSingleFileAsync();
+        if (file != null)
+        {
+            int count = FirewallService.ImportRules(file.Path, (config) =>
+            {
+                // Update local config
+                if (config.BlockInbound && !ViewModel.CurrentConfig.BlockedAppsInbound.Contains(config.ProcessName)) 
+                    ViewModel.CurrentConfig.BlockedAppsInbound.Add(config.ProcessName);
+                if (config.BlockOutbound && !ViewModel.CurrentConfig.BlockedAppsOutbound.Contains(config.ProcessName)) 
+                    ViewModel.CurrentConfig.BlockedAppsOutbound.Add(config.ProcessName);
+                if (!ViewModel.CurrentConfig.BlockedApps.Contains(config.ProcessName)) 
+                    ViewModel.CurrentConfig.BlockedApps.Add(config.ProcessName);
+
+                if (!string.IsNullOrEmpty(config.Notes)) 
+                    ViewModel.CurrentConfig.AppNotes[config.ProcessName] = config.Notes;
+                
+                if (config.DataLimitMb > 0) 
+                    ViewModel.CurrentConfig.DataLimits[config.ProcessName] = (long)(config.DataLimitMb * 1024 * 1024);
+            });
+            ViewModel.SaveConfig();
+            ShowMessage("Import Complete", $"Successfully imported {count} rules. Restart app to apply phantom apps.");
+        }
+    }
+
+    // ── Minimize to Tray (#40) ───────────────────────────────────────────────
+    private WinNetControl.Core.TrayService? _trayService;
+
+    private void OnMinimizeToTrayClicked(object sender, RoutedEventArgs e)
+    {
+        if (_trayService == null)
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            _trayService = new WinNetControl.Core.TrayService(hwnd, DispatcherQueue);
+        }
+        this.Hide();
+        // Since we don't have a full WndProc hook in TrayService yet, just warn:
+        System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ => 
+        {
+            DispatcherQueue.TryEnqueue(() => this.Show());
+        });
+    }
+
+    // ── Column Sorting (#8) — reads Tag for exact SortOptions key ────────────
+    private void OnSortHeaderTapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+    {
+        if (sender is TextBlock tb && tb.Tag is string sortKey && !string.IsNullOrEmpty(sortKey))
+        {
+            // If already sorted by this column, keep it (could toggle A-Z/Z-A in future)
+            ViewModel.SelectedSort = sortKey;
+        }
+    }
+
+    // ── App Notes (#11) ──────────────────────────────────────────────────────
+    private void OnAppNotesLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is ProcessNetworkInfo info)
+        {
+            ViewModel.CurrentConfig.AppNotes[info.ProcessName] = info.Notes ?? "";
+            ViewModel.SaveConfig();
         }
     }
 }
