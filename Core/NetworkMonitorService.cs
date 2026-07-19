@@ -22,6 +22,48 @@ public class NetworkMonitorService
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool QueryFullProcessImageName(IntPtr hProcess, uint dwFlags, System.Text.StringBuilder lpExeName, ref uint lpdwSize);
 
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, uint processInformationLength, out uint returnLength);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_BASIC_INFORMATION
+    {
+        public IntPtr Reserved1;
+        public IntPtr PebBaseAddress;
+        public IntPtr Reserved2_0;
+        public IntPtr Reserved2_1;
+        public IntPtr UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    private static readonly Dictionary<string, int> _launchCounts = new();
+
+    private string GetParentProcessName(int pid)
+    {
+        if (pid <= 4) return "System";
+        IntPtr hProcess = OpenProcess(0x1000, false, pid); // PROCESS_QUERY_LIMITED_INFORMATION
+        if (hProcess == IntPtr.Zero) return "Unknown";
+        
+        PROCESS_BASIC_INFORMATION pbi = new PROCESS_BASIC_INFORMATION();
+        uint returnLength;
+        int status = NtQueryInformationProcess(hProcess, 0, ref pbi, (uint)Marshal.SizeOf(pbi), out returnLength);
+        CloseHandle(hProcess);
+        
+        if (status != 0) return "Unknown";
+        
+        int parentPid = pbi.InheritedFromUniqueProcessId.ToInt32();
+        if (parentPid <= 0) return "Unknown";
+        
+        try
+        {
+            return Process.GetProcessById(parentPid).ProcessName;
+        }
+        catch
+        {
+            return "Unknown";
+        }
+    }
+
     private string GetProcessPath(int pid)
     {
         if (pid <= 4) return "System";
@@ -108,14 +150,27 @@ public class NetworkMonitorService
                 if (!_processMap.TryGetValue(pid, out var info))
                 {
                     string processName = GetProcessName(pid);
+                    string processPath = GetProcessPath(pid);
+                    
+                    _launchCounts.TryGetValue(processPath ?? processName, out int count);
+                    count++;
+                    _launchCounts[processPath ?? processName] = count;
+
                     info = new ProcessNetworkInfo
                     {
                         ProcessId = pid,
                         ProcessName = processName,
-                        ProcessPath = GetProcessPath(pid),
-                        AppType = ClassifyApp(pid)
+                        ProcessPath = processPath ?? string.Empty,
+                        AppType = ClassifyApp(pid),
+                        ParentProcessName = GetParentProcessName(pid),
+                        LaunchCount = count
                     };
                     _processMap[pid] = info;
+                    
+                    if (count == 1)
+                    {
+                        HistoryLogService.AddLog("Process Start", processName, $"PID: {pid}, Path: {processPath}");
+                    }
                 }
                 
                 info.CurrentConnections.Clear();

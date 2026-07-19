@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinNetControl.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                    <FontIcon Glyph="&#xE713;" FontSize="22" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="Appearance · Behavior · Startup · Data · About" FontSize="12" Foreground="Gray"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="14" Padding="16,14,16,28" MaxWidth="700" HorizontalAlignment="Left">
+
+                <!-- ── Appearance ── -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE790;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Appearance" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Theme" FontSize="12"/>
+                                <ComboBox x:Name="ThemeCombo" HorizontalAlignment="Stretch"
+                                          SelectionChanged="OnThemeChanged">
+                                    <ComboBoxItem Content="System Default" Tag="default"/>
+                                    <ComboBoxItem Content="Dark" Tag="dark"/>
+                                    <ComboBoxItem Content="Light" Tag="light"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Text="Navigation pane" FontSize="12"/>
+                                <ComboBox x:Name="NavPaneCombo" HorizontalAlignment="Stretch"
+                                          SelectionChanged="OnNavPaneChanged">
+                                    <ComboBoxItem Content="Left (expanded)" Tag="left"/>
+                                    <ComboBoxItem Content="Left (compact)" Tag="compact"/>
+                                    <ComboBoxItem Content="Top" Tag="top"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <ToggleSwitch x:Name="AcrylicSwitch" Header="Acrylic / Mica background"
+                                      Toggled="OnAcrylicToggled"/>
+                        <ToggleSwitch x:Name="AnimationsSwitch" Header="Smooth animations"
+                                      IsOn="True"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Behavior ── -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE9CE;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Behavior" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <ToggleSwitch x:Name="StartWithWindowsSwitch" Header="Start with Windows"
+                                      Toggled="OnStartWithWindowsToggled"/>
+                        <ToggleSwitch x:Name="StartMinimizedSwitch" Header="Start minimized to system tray"
+                                      Toggled="OnStartMinimizedToggled"/>
+                        <ToggleSwitch x:Name="BlockNewAppsSwitch" Header="Block new apps by default"
+                                      Toggled="OnBlockNewAppsToggled"/>
+                        <ToggleSwitch x:Name="ShowOfflineSwitch" Header="Show offline/blocked apps"
+                                      Toggled="OnShowOfflineToggled"/>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Refresh interval" FontSize="12"/>
+                            <ComboBox x:Name="RefreshCombo" HorizontalAlignment="Left" Width="220"
+                                      SelectionChanged="OnRefreshIntervalChanged">
+                                <ComboBoxItem Content="500 ms (fast)" Tag="500"/>
+                                <ComboBoxItem Content="1 second" Tag="1000"/>
+                                <ComboBoxItem Content="2 seconds" Tag="2000"/>
+                                <ComboBoxItem Content="5 seconds (low CPU)" Tag="5000"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Notifications ── -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE7E7;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Notifications" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Name="NotifyBlockSwitch" Header="Notify when app is blocked"/>
+                        <ToggleSwitch x:Name="NotifyHighUsageSwitch" Header="Notify on high bandwidth usage"/>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="High bandwidth threshold" FontSize="12"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <NumberBox x:Name="ThresholdBox" Value="10" Minimum="1" Maximum="1000"
+                                           SpinButtonPlacementMode="Inline" Width="160"/>
+                                <TextBlock Text="MB/s" VerticalAlignment="Center" Foreground="Gray"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Data & Privacy ── -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE8D7;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Data &amp; Storage" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Padding="12,6" Click="OnOpenConfigFolder">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8B7;" FontSize="13"/>
+                                    <TextBlock Text="Open Config Folder" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="12,6" Click="OnExportConfig">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE898;" FontSize="13"/>
+                                    <TextBlock Text="Export Config" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="12,6" Click="OnClearHistory">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="#E02020"/>
+                                    <TextBlock Text="Clear History Log" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock x:Name="DataStatus" Text="" FontSize="11" Foreground="Gray"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── About ── -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE946;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="About" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Grid ColumnSpacing="24" RowSpacing="6">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Application" Foreground="Gray" FontSize="11"/>
+                            <TextBlock Grid.Column="1" Text="HOC Network Control" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="1" Text="Version" Foreground="Gray" FontSize="11"/>
+                            <TextBlock x:Name="VersionText" Grid.Row="1" Grid.Column="1" FontSize="11"/>
+                            <TextBlock Grid.Row="2" Text="Platform" Foreground="Gray" FontSize="11"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" FontSize="11" Text="Windows 11 · WinUI 3 · .NET 8"/>
+                            <TextBlock Grid.Row="3" Text="Config path" Foreground="Gray" FontSize="11"/>
+                            <TextBlock x:Name="ConfigPathText" Grid.Row="3" Grid.Column="1" FontSize="11"
+                                       IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <Button Padding="10,6" Click="OnCheckForUpdates">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+                                    <TextBlock Text="Check for Updates" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="10,6" Click="OnOpenNetworkConnections">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE839;" FontSize="13"/>
+                                    <TextBlock Text="ncpa.cpl" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="10,6" Click="OnOpenWindowsSettings">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE713;" FontSize="13"/>
+                                    <TextBlock Text="Windows Settings" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Save button -->
+                <Button HorizontalAlignment="Left" Padding="18,10" Click="OnSave"
+                        Style="{ThemeResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE74E;" FontSize="14"/>
+                        <TextBlock Text="Save Settings" FontSize="13"/>
+                    </StackPanel>
+                </Button>
+                <TextBlock x:Name="SaveStatus" Text="" FontSize="11" Foreground="#107C10"/>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

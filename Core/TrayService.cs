@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.UI.Dispatching;
@@ -56,7 +56,6 @@ public sealed class TrayService : IDisposable
     private readonly DispatcherQueue _dq;
     private Func<string>?  _tooltipProvider;
 
-    public event Action? ShowMainWindowRequested;
 
     public TrayService(nint mainHwnd, DispatcherQueue dq)
     {

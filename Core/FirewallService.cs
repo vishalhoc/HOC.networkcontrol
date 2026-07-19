@@ -42,8 +42,22 @@ public static class FirewallService
 
     public static void UnblockApp(string appName)
     {
-        UnblockAppInbound(appName);
-        UnblockAppOutbound(appName);
+        string ruleIn = $"WinNetControl_Block_{appName}_In";
+        string ruleOut = $"WinNetControl_Block_{appName}_Out";
+
+        var psiIn = new System.Diagnostics.ProcessStartInfo("netsh", $"advfirewall firewall delete rule name=\"{ruleIn}\"");
+        psiIn.CreateNoWindow = true;
+        psiIn.UseShellExecute = true;
+        psiIn.Verb = "runas";
+        System.Diagnostics.Process.Start(psiIn)?.WaitForExit();
+
+        var psiOut = new System.Diagnostics.ProcessStartInfo("netsh", $"advfirewall firewall delete rule name=\"{ruleOut}\"");
+        psiOut.CreateNoWindow = true;
+        psiOut.UseShellExecute = true;
+        psiOut.Verb = "runas";
+        System.Diagnostics.Process.Start(psiOut)?.WaitForExit();
+
+        HistoryLogService.AddLog("Firewall Rule Removed", appName, "Removed both Inbound and Outbound block rules");
     }
 
     public static void BlockAppInbound(string appName, string appPath)
@@ -51,12 +65,13 @@ public static class FirewallService
         if (string.IsNullOrWhiteSpace(appPath)) return;
         string rule = InboundRuleName(appName);
         DeleteRule(rule);
-        RunNetsh($"advfirewall firewall add rule name=\"{rule}\" " +
-                 $"dir=in action=block program=\"{appPath}\" enable=yes");
+        var psi = new System.Diagnostics.ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{rule}\" dir=in action=block program=\"{appPath}\" enable=yes");
+        psi.CreateNoWindow = true;
+        psi.UseShellExecute = true;
+        psi.Verb = "runas";
+        System.Diagnostics.Process.Start(psi)?.WaitForExit();
+        HistoryLogService.AddLog("Firewall Rule Added", appName, $"Direction: Inbound, Path: {appPath}");
     }
-
-    public static void UnblockAppInbound(string appName)
-        => DeleteRule(InboundRuleName(appName));
 
     public static void BlockAppOutbound(string appName, string appPath)
     {
@@ -65,10 +80,20 @@ public static class FirewallService
         DeleteRule(rule);
         RunNetsh($"advfirewall firewall add rule name=\"{rule}\" " +
                  $"dir=out action=block program=\"{appPath}\" enable=yes");
+        HistoryLogService.AddLog("Firewall Rule Added", appName, $"Direction: Outbound, Path: {appPath}");
     }
 
     public static void UnblockAppOutbound(string appName)
-        => DeleteRule(OutboundRuleName(appName));
+    {
+        DeleteRule(OutboundRuleName(appName));
+        HistoryLogService.AddLog("Firewall Rule Removed", appName, "Removed Outbound block rule");
+    }
+
+    public static void UnblockAppInbound(string appName)
+    {
+        DeleteRule(InboundRuleName(appName));
+        HistoryLogService.AddLog("Firewall Rule Removed", appName, "Removed Inbound block rule");
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Per-connection block / unblock  (remote IP + port rules)
@@ -206,6 +231,17 @@ public static class FirewallService
             key?.SetValue(StartupValueName, $"\"{exePath}\"");
         }
         catch { }
+    }
+
+    public static bool IsStartupEnabled()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser
+                .OpenSubKey(StartupKeyPath, writable: false);
+            return key?.GetValue(StartupValueName) != null;
+        }
+        catch { return false; }
     }
 
     public static void RemoveStartupTask()

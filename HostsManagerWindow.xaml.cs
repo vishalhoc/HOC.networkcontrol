@@ -39,9 +39,20 @@ public sealed partial class HostsManagerWindow : Window
     {
         _allEntries = HostsFileService.ReadEntries();
         _hasUnsavedChanges = false;
+        UpdateTitle();
         ApplyFilter();
         StatusText.Text = string.Empty;
     }
+
+    // CS0414 fix: _hasUnsavedChanges is read here to drive title dirty-indicator
+    private void SetDirty()
+    {
+        SetDirty();
+        UpdateTitle();
+    }
+
+    private void UpdateTitle()
+        => this.AppWindow.Title = _hasUnsavedChanges ? "• Hosts Manager (unsaved)" : "Hosts Manager";
 
     private void ApplyFilter()
     {
@@ -90,7 +101,7 @@ public sealed partial class HostsManagerWindow : Window
             LineIndex = _allEntries.Count
         };
         _allEntries.Add(entry);
-        _hasUnsavedChanges = true;
+        SetDirty();
         QuickHostnameBox.Text = string.Empty;
         ApplyFilter();
         ShowStatus($"✓ '{hostname}' → {ip} added. Click Save to apply.", error: false);
@@ -130,7 +141,7 @@ public sealed partial class HostsManagerWindow : Window
         { ShowStatus("IP and Hostname are required.", error: true); return; }
 
         _allEntries.Add(new HostsEntry { Ip = ip, Hostname = host, Comment = commentBox.Text.Trim(), IsEnabled = true, LineIndex = _allEntries.Count });
-        _hasUnsavedChanges = true;
+        SetDirty();
         ApplyFilter();
         ShowStatus($"✓ Entry added. Click Save to apply.", false);
     }
@@ -154,7 +165,7 @@ public sealed partial class HostsManagerWindow : Window
         var idxs = selected.Select(e2 => e2.LineIndex).ToHashSet();
         _allEntries.RemoveAll(e2 => idxs.Contains(e2.LineIndex));
         for (int i = 0; i < _allEntries.Count; i++) _allEntries[i].LineIndex = i;
-        _hasUnsavedChanges = true;
+        SetDirty();
         ApplyFilter();
         ShowStatus($"✓ {selected.Count} entries removed. Click Save.", false);
     }
@@ -176,7 +187,7 @@ public sealed partial class HostsManagerWindow : Window
 
             _allEntries.RemoveAll(e2 => e2.LineIndex == entry.LineIndex);
             for (int i = 0; i < _allEntries.Count; i++) _allEntries[i].LineIndex = i;
-            _hasUnsavedChanges = true;
+            SetDirty();
             ApplyFilter();
             ShowStatus("✓ Entry removed. Click Save.", false);
         }
@@ -188,7 +199,7 @@ public sealed partial class HostsManagerWindow : Window
         if (sender is ToggleButton tb && tb.DataContext is HostsEntry entry)
         {
             entry.IsEnabled    = tb.IsChecked == true;
-            _hasUnsavedChanges = true;
+            SetDirty();
             ShowStatus("Entry updated — click Save to write to disk.", false);
         }
     }

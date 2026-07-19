@@ -26,7 +26,6 @@
             <core:BoolToOnOffConverter               x:Key="BoolToOnOffConverter"/>
             <core:DataUsageTierToBrushConverter      x:Key="DataUsageTierToBrushConverter"/>
             <core:DataUsageTierToVisibilityConverter x:Key="DataUsageTierToVisibilityConverter"/>
-            <core:SuspiciousToBrushConverter         x:Key="SuspiciousToBrushConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

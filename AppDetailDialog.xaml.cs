@@ -17,6 +17,7 @@ public sealed partial class AppDetailDialog : ContentDialog
     private readonly ProcessNetworkInfo         _process;
     private readonly Action<ProcessNetworkInfo>? _blockCallback;
     private readonly Action<ProcessNetworkInfo>? _unblockCallback;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _updateTimer;
 
     public AppDetailDialog(ProcessNetworkInfo process,
                            Action<ProcessNetworkInfo>? blockCallback   = null,
@@ -26,9 +27,17 @@ public sealed partial class AppDetailDialog : ContentDialog
         _process         = process;
         _blockCallback   = blockCallback;
         _unblockCallback = unblockCallback;
-        PopulateDetails();
+
         LoadAppIcon();
         PopulateProcessInfo();
+        PopulateDetails();
+
+        _updateTimer = this.DispatcherQueue.CreateTimer();
+        _updateTimer.Interval = TimeSpan.FromSeconds(1);
+        _updateTimer.Tick += (s, e) => PopulateDetails();
+        _updateTimer.Start();
+
+        this.Closed += (s, e) => _updateTimer.Stop();
     }
 
     // ── Main populate ─────────────────────────────────────────────────────────
@@ -79,6 +88,9 @@ public sealed partial class AppDetailDialog : ContentDialog
         InRuleAction.Foreground  = new SolidColorBrush(_process.BlockInbound  ? Colors.OrangeRed : Colors.LimeGreen);
         OutRuleAction.Foreground = new SolidColorBrush(_process.BlockOutbound ? Colors.OrangeRed : Colors.LimeGreen);
 
+        // Draw Chart
+        DrawBandwidthChart();
+
         InRuleEnabled.Text  = _process.BlockInbound  ? "Yes" : "No";
         OutRuleEnabled.Text = _process.BlockOutbound ? "Yes" : "No";
         InRuleEnabled.Foreground  = new SolidColorBrush(_process.BlockInbound  ? Colors.OrangeRed : Colors.LimeGreen);
@@ -114,7 +126,7 @@ public sealed partial class AppDetailDialog : ContentDialog
         }
         catch { InfoProduct.Text = InfoCompany.Text = InfoVersion.Text = "—"; }
 
-        // Process start time
+        // Process start time and parent
         try
         {
             if (_process.ProcessId > 0)
@@ -125,6 +137,21 @@ public sealed partial class AppDetailDialog : ContentDialog
             else InfoStartTime.Text = "—";
         }
         catch { InfoStartTime.Text = "—"; }
+
+        InfoParentProc.Text = _process.ParentProcessName;
+        InfoLaunchCount.Text = _process.LaunchCount.ToString();
+        InfoLastActive.Text = _process.LastActiveTime.ToString("HH:mm:ss");
+        
+        if (_process.IsIdle)
+        {
+            InfoIsIdle.Text = "Yes (>5m idle)";
+            InfoIsIdle.Foreground = new SolidColorBrush(Colors.Orange);
+        }
+        else
+        {
+            InfoIsIdle.Text = "No (Active)";
+            InfoIsIdle.Foreground = new SolidColorBrush(Colors.LimeGreen);
+        }
 
         // Authenticode signature check (#28)
         CheckSignature();
@@ -142,7 +169,7 @@ public sealed partial class AppDetailDialog : ContentDialog
         try
         {
             var cert = System.Security.Cryptography.X509Certificates
-                             .X509Certificate.CreateFromSignedFile(path);
+                             .X509CertificateLoader.LoadCertificateFromFile(path);
             string subject = cert.Subject;
             // Parse CN= from subject for cleaner display
             var match = System.Text.RegularExpressions.Regex.Match(subject, @"CN=([^,]+)");
@@ -259,5 +286,43 @@ public sealed partial class AppDetailDialog : ContentDialog
         if (bytes < 1024 * 1024)            return $"{bytes / 1024.0:F1} KB";
         if (bytes < 1024L * 1024 * 1024)   return $"{bytes / 1024.0 / 1024:F2} MB";
         return $"{bytes / 1024.0 / 1024 / 1024:F2} GB";
+    }
+
+    private void DrawBandwidthChart()
+    {
+        if (BandwidthChartCanvas == null) return;
+        BandwidthChartCanvas.Children.Clear();
+
+        var history = _process.SpeedHistory;
+        if (history == null || history.Count == 0) return;
+
+        double width = BandwidthChartCanvas.ActualWidth;
+        double height = BandwidthChartCanvas.ActualHeight;
+
+        if (width <= 0 || height <= 0)
+        {
+            width = 600;
+            height = 65;
+        }
+
+        double maxSpeed = 1;
+        foreach (var val in history)
+            if (val > maxSpeed) maxSpeed = val;
+
+        var polyline = new Microsoft.UI.Xaml.Shapes.Polyline
+        {
+            Stroke = new SolidColorBrush(Microsoft.UI.Colors.CornflowerBlue),
+            StrokeThickness = 2,
+            StrokeLineJoin = Microsoft.UI.Xaml.Media.PenLineJoin.Round
+        };
+
+        double stepX = width / (history.Count - 1);
+        for (int i = 0; i < history.Count; i++)
+        {
+            double x = i * stepX;
+            double y = height - ((history[i] / maxSpeed) * height);
+            polyline.Points.Add(new Windows.Foundation.Point(x, y));
+        }
+        BandwidthChartCanvas.Children.Add(polyline);
     }
 }

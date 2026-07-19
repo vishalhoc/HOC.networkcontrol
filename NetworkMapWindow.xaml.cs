@@ -66,7 +66,7 @@ public sealed partial class NetworkMapWindow : Window
             .Where(c => !string.IsNullOrEmpty(c.RemoteAddress) && c.RemoteAddress != "0.0.0.0")
             .GroupBy(c => c.RemoteAddress)
             .Take(8)
-            .Select(g => (ip: g.Key, blocked: g.First().IsBlocked, port: g.First().RemotePort,
+            .Select(g => (ip: g.Key, blocked: g.First().IsBlocked, suspicious: g.First().IsSuspicious, port: g.First().RemotePort,
                           country: g.First().GeoCountry ?? ""))
             .ToList();
 
@@ -185,21 +185,24 @@ public sealed partial class NetworkMapWindow : Window
 
             for (int i = 0; i < remoteHosts.Count; i++)
             {
-                var (ip, blocked, port, country) = remoteHosts[i];
+                var (ip, blocked, suspicious, port, country) = remoteHosts[i];
                 double remY = remStartY + i * (NodeH + RowGap);
                 string label = $":{port}" + (string.IsNullOrEmpty(country) ? "" : $" · {country}");
+                string statusColor = blocked ? "#CC3300" : suspicious ? "#FFB900" : "#107C10";
+                string statusText = blocked ? "BLOCKED" : suspicious ? "SUSPICIOUS" : "ACTIVE";
 
                 DrawNode(MapCanvas, remX, remY,
                          icon: "\uE704",
                          title: ip,
                          subtitle: label,
-                         statusColor: blocked ? "#CC3300" : "#107C10",
-                         statusText: blocked ? "BLOCKED" : "ACTIVE");
+                         statusColor: statusColor,
+                         statusText: statusText,
+                         tooltip: $"IP: {ip}\nPort: {port}\nStatus: {statusText}" + (string.IsNullOrEmpty(country) ? "" : $"\nLocation: {country}"));
 
                 // Arrow from DNS to each remote (fan out)
                 DrawArrow(dnsX + NodeW, centerY,
                           remX, remY + NodeH / 2,
-                          blocked ? "#CC3300" : "#107C10",
+                          statusColor,
                           label: i == 0 ? "Internet" : "");
             }
         }
@@ -210,7 +213,7 @@ public sealed partial class NetworkMapWindow : Window
 
     private void DrawResponsePath(double appX, double fwX, double adX, double gwX,
                                    double dnsX, double remX, double cy,
-                                   List<(string ip, bool blocked, int port, string country)> remotes)
+                                   List<(string ip, bool blocked, bool suspicious, int port, string country)> remotes)
     {
         double responseY = cy + NodeH + 50;
         string color     = "#107C10";

@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinNetControl.Pages.PacketCapturePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Header ─────────────────────────────────────────────────────── -->
+        <Border Grid.Row="0" Padding="20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Border CornerRadius="10" Padding="10"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <FontIcon Glyph="&#xE72C;" FontSize="22"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Packet Capture" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="Live capture, filter, and export network packets (requires elevation)."
+                                   FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+                </StackPanel>
+                <!-- Live stats chips -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Border CornerRadius="16" Padding="10,4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE9F5;" FontSize="13" Foreground="#2196F3"/>
+                            <TextBlock x:Name="StatPackets" Text="0 packets" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="16" Padding="10,4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <TextBlock x:Name="StatRate" Text="0 pkt/s" FontSize="12"/>
+                    </Border>
+                    <Border CornerRadius="16" Padding="10,4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <TextBlock x:Name="StatProtocols" Text="TCP: 0% | UDP: 0% | DNS: 0% | ICMP: 0%" FontSize="11"/>
+                    </Border>
+                    <Border CornerRadius="16" Padding="10,4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xEBD2;" FontSize="13" Foreground="#4CAF50"/>
+                            <TextBlock x:Name="StatBytes" Text="0 B captured" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="16" Padding="10,4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse x:Name="CaptureLed" Width="8" Height="8" Fill="#555"/>
+                            <TextBlock x:Name="CaptureStateText" Text="Idle" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── Toolbar ────────────────────────────────────────────────────── -->
+        <Border Grid.Row="1" Padding="16,10"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Start/Stop capture -->
+                <Button x:Name="BtnStart" Grid.Column="0" Click="OnStartCapture"
+                        Style="{ThemeResource AccentButtonStyle}" Padding="12,6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon x:Name="StartIcon" Glyph="&#xE102;" FontSize="14"/>
+                        <TextBlock x:Name="StartBtnText" Text="Start Capture"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Clear -->
+                <Button Grid.Column="1" Click="OnClear" Padding="10,6" Margin="6,0,0,0"
+                        ToolTipService.ToolTip="Clear all packets">
+                    <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                </Button>
+
+                <!-- Export pcap -->
+                <Button Grid.Column="2" Click="OnExportPcap" Padding="10,6" Margin="6,0,0,0"
+                        ToolTipService.ToolTip="Export as .pcap (open in Wireshark)">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE898;" FontSize="14"/>
+                        <TextBlock Text="Export .pcap"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Export CSV -->
+                <Button Grid.Column="3" Click="OnExportCsv" Padding="10,6" Margin="6,0,0,0"
+                        ToolTipService.ToolTip="Export as CSV">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE9F9;" FontSize="14"/>
+                        <TextBlock Text="CSV"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Capture interface (raw sockets can capture one IPv4 adapter at a time) -->
+                <ComboBox x:Name="InterfaceBox" Grid.Column="4" Width="230"
+                          PlaceholderText="Capture interface"
+                          DisplayMemberPath="DisplayName"
+                          SelectionChanged="OnCaptureInterfaceChanged"
+                          ToolTipService.ToolTip="Select the active network interface to capture"/>
+
+                <!-- Protocol filter -->
+                <ComboBox x:Name="ProtoFilter" Grid.Column="5" Width="120"
+                          SelectionChanged="OnFilterChanged" PlaceholderText="Protocol">
+                    <ComboBoxItem Content="All" Tag="all" IsSelected="True"/>
+                    <ComboBoxItem Content="TCP"  Tag="TCP"/>
+                    <ComboBoxItem Content="UDP"  Tag="UDP"/>
+                    <ComboBoxItem Content="ICMP" Tag="ICMP"/>
+                    <ComboBoxItem Content="DNS"  Tag="DNS"/>
+                    <ComboBoxItem Content="HTTP" Tag="HTTP"/>
+                </ComboBox>
+
+                <Rectangle Grid.Column="6" Width="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,2"/>
+
+                <!-- Search / BPF filter -->
+                <TextBox x:Name="FilterBox" Grid.Column="7"
+                         PlaceholderText="Filter: IP, port, keyword e.g. 192.168.1.1 or :443"
+                         TextChanged="OnFilterChanged" VerticalAlignment="Center"/>
+
+                <!-- Max rows -->
+                <ComboBox x:Name="MaxRowsBox" Grid.Column="8" Width="110" Margin="6,0,0,0"
+                          SelectionChanged="OnMaxRowsChanged" ToolTipService.ToolTip="Max rows (older packets discarded)">
+                    <ComboBoxItem Content="500 rows"   Tag="500"  IsSelected="True"/>
+                    <ComboBoxItem Content="1 000 rows" Tag="1000"/>
+                    <ComboBoxItem Content="5 000 rows" Tag="5000"/>
+                    <ComboBoxItem Content="Unlimited"  Tag="0"/>
+                </ComboBox>
+
+                <!-- Auto-scroll toggle -->
+                <ToggleButton x:Name="AutoScrollBtn" Grid.Column="9" Margin="6,0,0,0"
+                              IsChecked="True" ToolTipService.ToolTip="Auto-scroll to newest packet">
+                    <FontIcon Glyph="&#xE74B;" FontSize="14"/>
+                </ToggleButton>
+
+                <!-- Hex view toggle -->
+                <ToggleButton x:Name="HexViewBtn" Grid.Column="10" Margin="6,0,0,0"
+                              IsChecked="False" ToolTipService.ToolTip="Show hex payload"
+                              Click="OnHexToggle">
+                    <TextBlock Text="HEX" FontSize="11" FontWeight="SemiBold"/>
+                </ToggleButton>
+            </Grid>
+        </Border>
+
+        <!-- ── Packet Grid ────────────────────────────────────────────────── -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <ListView x:Name="PacketList"
+                      SelectionMode="Single"
+                      SelectionChanged="OnPacketSelected"
+                      FontFamily="Consolas" FontSize="12"
+                      IsItemClickEnabled="False">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0,1"/>
+                        <Setter Property="MinHeight" Value="0"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.Header>
+                    <Grid Background="{ThemeResource LayerFillColorDefaultBrush}"
+                          Padding="12,6" BorderThickness="0,0,0,1"
+                          BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="#"         FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="1" Text="Time"      FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="2" Text="Proto"     FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="3" Text="Source"    FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="4" Text="S.Port"    FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="5" Text="Dest"      FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="6" Text="D.Port"    FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="7" Text="Len"       FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="8" Text="Info"      FontWeight="SemiBold" FontSize="11"/>
+                    </Grid>
+                </ListView.Header>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="12,3" Background="{Binding RowBrush}">
+                            <Grid.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="Check Packet Journey" Click="OnPacketJourneyClick" Tag="{Binding}"/>
+                                    <MenuFlyoutItem Text="Trace Source IP" Click="OnTraceSourceIp" Tag="{Binding}"/>
+                                    <MenuFlyoutSeparator/>
+                                    <MenuFlyoutItem Text="Copy IP" Click="OnCopyPacketIp" Tag="{Binding}"/>
+                                    <MenuFlyoutItem Text="Copy Full Row" Click="OnCopyPacketRow" Tag="{Binding}"/>
+                                </MenuFlyout>
+                            </Grid.ContextFlyout>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding Index}"      TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Time}"       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Protocol}"   TextTrimming="CharacterEllipsis" Foreground="{Binding ProtoColor}"/>
+                            <TextBlock Grid.Column="3" Text="{Binding SrcIp}"      TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="4" Text="{Binding SrcPort}"    TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="5" Text="{Binding DstIp}"      TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="6" Text="{Binding DstPort}"    TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="7" Text="{Binding Length}"     TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="8" Text="{Binding Info}"       TextTrimming="CharacterEllipsis" Opacity="0.75"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Detail / Hex pane — shown when a packet is selected -->
+            <Border Grid.Column="1" x:Name="DetailPane"
+                    Visibility="Collapsed"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1,0,0,0"
+                    Width="340" MinWidth="240" MaxWidth="600">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <!-- Detail pane header with close button -->
+                    <Border Grid.Row="0" Padding="14,8"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <TextBlock Text="Packet Detail" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                            <Button HorizontalAlignment="Right" Padding="6,4"
+                                    Click="OnCloseDetailPane" ToolTipService.ToolTip="Close detail pane">
+                                <FontIcon Glyph="&#xE711;" FontSize="12"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="12" Padding="14">
+                            <TextBlock x:Name="DetailSummary" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock Text="Hex Payload" FontWeight="SemiBold" FontSize="13"
+                                       x:Name="HexHeader" Visibility="Collapsed"/>
+                            <TextBlock x:Name="HexBlock" FontFamily="Consolas" FontSize="11"
+                                       TextWrapping="Wrap" Visibility="Collapsed"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ── Status bar ─────────────────────────────────────────────────── -->
+        <Border Grid.Row="3" Padding="16,6"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusBar" Text="Ready. Press Start to begin capture."
+                           FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                <ProgressRing x:Name="CaptureProgress" Grid.Column="1"
+                              Width="16" Height="16" IsActive="False" Visibility="Collapsed"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

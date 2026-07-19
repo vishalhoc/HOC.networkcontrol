@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="WinNetControl.Pages.HostsManagerPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <FontIcon Glyph="&#xE8C4;" FontSize="22" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Hosts File Manager" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="HostsPathText" FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Padding="10,6" Click="OnOpenNotepad">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8A5;" FontSize="13"/>
+                            <TextBlock Text="Open in Notepad" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Padding="10,6" Click="OnReload">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+                            <TextBlock Text="Reload" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Padding="10,6" Click="OnResetDefault">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE777;" FontSize="13" Foreground="#FBBC05"/>
+                            <TextBlock Text="Reset to Default" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnSpacing="12" Margin="16,14,16,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left panel: Add entry + Block presets -->
+            <StackPanel Grid.Column="0" Spacing="12">
+
+                <!-- Add entry -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Add Entry" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox x:Name="AddIpBox"       Header="IP Address"   PlaceholderText="0.0.0.0 or 127.0.0.1"/>
+                        <TextBox x:Name="AddHostnameBox" Header="Hostname"     PlaceholderText="example.com"/>
+                        <TextBox x:Name="AddCommentBox"  Header="Comment (optional)" PlaceholderText="my rule"/>
+                        <Button HorizontalAlignment="Stretch" Padding="10,8"
+                                Click="OnAddEntry" Style="{ThemeResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE710;" FontSize="13"/>
+                                <TextBlock Text="Add Entry"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Block presets -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Block Presets" FontSize="13" FontWeight="SemiBold"/>
+                        <Button HorizontalAlignment="Stretch" Padding="10,7" Click="OnBlockPreset" Tag="ads">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE8D4;" FontSize="14"/>
+                                <TextBlock Text="Block Ad Networks" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button HorizontalAlignment="Stretch" Padding="10,7" Click="OnBlockPreset" Tag="telemetry">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE7EF;" FontSize="14"/>
+                                <TextBlock Text="Block MS Telemetry" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button HorizontalAlignment="Stretch" Padding="10,7" Click="OnBlockPreset" Tag="social">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE716;" FontSize="14"/>
+                                <TextBlock Text="Block Social Media" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button HorizontalAlignment="Stretch" Padding="10,7" Click="OnBlockPreset" Tag="gaming">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE7FC;" FontSize="14"/>
+                                <TextBlock Text="Block Gaming Trackers" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button HorizontalAlignment="Stretch" Padding="10,7" Click="OnRemoveAllWnc">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="#E02020"/>
+                                <TextBlock Text="Remove All WNC Entries" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Status -->
+                <Border CornerRadius="10" Padding="12"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <TextBlock x:Name="StatusText" FontSize="11" Foreground="Gray"
+                               TextWrapping="Wrap" Text="Ready."/>
+                </Border>
+            </StackPanel>
+
+            <!-- Right: Entry list -->
+            <Border Grid.Column="1" CornerRadius="12" Padding="0"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Search + stats -->
+                    <Border Grid.Row="0" Padding="14,10"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock x:Name="EntryCountText" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                <CheckBox x:Name="ShowCommentsCheck" Content="Show comments" FontSize="11"
+                                          IsChecked="False" Checked="OnFilterChanged" Unchecked="OnFilterChanged"/>
+                                <CheckBox x:Name="ShowDisabledCheck" Content="Show disabled" FontSize="11"
+                                          IsChecked="True" Checked="OnFilterChanged" Unchecked="OnFilterChanged"/>
+                            </StackPanel>
+                            <TextBox x:Name="SearchBox" PlaceholderText="Search hosts…"
+                                     Width="200" HorizontalAlignment="Right"
+                                     TextChanged="OnSearch"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Column headers -->
+                    <Border Grid.Row="1" Padding="14,8"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="64"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="IP Address"  FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="1" Text="Hostname"   FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="2" Text="Source/Comment" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="3" Text="Enabled"   FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="4" Text="Delete"    FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- List -->
+                    <ListView x:Name="EntriesList" Grid.Row="2" SelectionMode="Single">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="14,6"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="64"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding DisplayIp}"
+                                               FontFamily="Consolas" FontSize="11"
+                                               VerticalAlignment="Center"
+                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Hostname}"
+                                               FontSize="12" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding DisplaySource}"
+                                               FontSize="11" Foreground="Gray"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    <ToggleSwitch Grid.Column="3" IsOn="{Binding IsEnabled}"
+                                                  MinWidth="0" OffContent="" OnContent=""
+                                                  Toggled="OnToggleEntry"/>
+                                    <Button Grid.Column="4" Padding="6,4"
+                                            Click="OnDeleteEntry" Tag="{Binding LineIndex}">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="12"/>
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

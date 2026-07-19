@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinNetControl.Pages.SpeedToolsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Padding="20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                    <FontIcon Glyph="&#xEC4A;" FontSize="22" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Speed Test" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="Measure your internet download · upload · latency" FontSize="12" Foreground="Gray"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="16" Padding="20,20,20,30" MaxWidth="700" HorizontalAlignment="Center">
+
+                <!-- Big gauge display -->
+                <Border CornerRadius="16" Padding="30,28"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="20" HorizontalAlignment="Center">
+
+                        <!-- Current speed display -->
+                        <StackPanel HorizontalAlignment="Center" Spacing="4">
+                            <TextBlock x:Name="PhaseLabel" Text="Ready" FontSize="14" Foreground="Gray"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="SpeedDisplay" Text="—" FontSize="56" FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock x:Name="SpeedUnit" Text="Mbps" FontSize="18" Foreground="Gray"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Progress bar -->
+                        <ProgressBar x:Name="TestProgress" Maximum="100" Value="0"
+                                     Height="8" CornerRadius="4" Width="300"/>
+
+                        <!-- Run button -->
+                        <Button x:Name="RunBtn" Padding="30,12" Click="OnRunTest"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon x:Name="RunIcon" Glyph="&#xEC4A;" FontSize="18"/>
+                                <TextBlock x:Name="RunBtnText" Text="Start Speed Test" FontSize="14"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Result cards -->
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" CornerRadius="12" Padding="16,14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="6" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE896;" FontSize="24" Foreground="#107C10"/>
+                            <TextBlock Text="Download" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="ResultDownload" Text="—" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Foreground="#107C10"/>
+                            <TextBlock Text="Mbps" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" CornerRadius="12" Padding="16,14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="6" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE898;" FontSize="24" Foreground="#0078D4"/>
+                            <TextBlock Text="Upload" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="ResultUpload" Text="—" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Foreground="#0078D4"/>
+                            <TextBlock Text="Mbps" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" CornerRadius="12" Padding="16,14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="6" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE879;" FontSize="24" Foreground="#FBBC05"/>
+                            <TextBlock Text="Ping / Latency" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="ResultPing" Text="—" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Foreground="#FBBC05"/>
+                            <TextBlock Text="ms" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Test server info -->
+                <Border CornerRadius="12" Padding="14"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Test Server" FontSize="10" Foreground="Gray"/>
+                            <TextBlock x:Name="ServerName" Text="—" FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Text="Test Size" FontSize="10" Foreground="Gray"/>
+                            <TextBlock x:Name="TestSize" Text="25 MB" FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="2">
+                            <TextBlock Text="Status" FontSize="10" Foreground="Gray"/>
+                            <TextBlock x:Name="TestStatusText" Text="Idle" FontSize="12"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- History -->
+                <Border CornerRadius="12" Padding="14"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Test History" FontSize="13" FontWeight="SemiBold"/>
+                        <ListView x:Name="HistoryList" SelectionMode="None" MaxHeight="220">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="0,4"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Time}" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Down}" FontSize="11" Foreground="#107C10" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Up}" FontSize="11" Foreground="#0078D4" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Ping}" FontSize="11" Foreground="#FBBC05" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

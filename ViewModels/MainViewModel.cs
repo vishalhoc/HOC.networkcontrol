@@ -14,8 +14,9 @@ public partial class MainViewModel : ObservableObject
     private readonly NetworkSpeedMonitorService _speedMonitor;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
-    public AppConfig CurrentConfig { get; }
+    public AppConfig CurrentConfig { get; private set; }
     public HttpProxyService ProxyService { get; }
+    public WinNetControl.Core.AppIconCache IconCache { get; } = new();
 
     // Session tracking
     public DateTime SessionStartTime { get; } = DateTime.Now;
@@ -127,16 +128,27 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<NetworkAdapterInfo> _networkAdapters = new();
     [ObservableProperty] private double _globalUploadSpeed;
     [ObservableProperty] private double _globalDownloadSpeed;
+    [ObservableProperty] private long _globalTotalSent;
+    [ObservableProperty] private Type? _currentPageType;
+
+    // Payload for passing IP to PacketJourneyPage
+    [ObservableProperty] private string _targetPacketJourneyIp = "";
+
+    [ObservableProperty] private long _globalTotalReceived; // bytes downloaded this session
 
     // Pre-formatted stats bar strings
-    public string GlobalUploadText   => FormatSpeed(GlobalUploadSpeed);
-    public string GlobalDownloadText => FormatSpeed(GlobalDownloadSpeed);
-    public string GlobalTotalText    => FormatSize(GlobalTotalDataUsed);
-    public string BlockedCountText   => $"{Processes.Count(p => p.IsBlocked)} blocked";
+    public string GlobalUploadText       => FormatSpeed(GlobalUploadSpeed);
+    public string GlobalDownloadText     => FormatSpeed(GlobalDownloadSpeed);
+    public string GlobalTotalText        => FormatSize(GlobalTotalDataUsed);
+    public string GlobalTotalSentText    => FormatSize(GlobalTotalSent);
+    public string GlobalTotalReceivedText => FormatSize(GlobalTotalReceived);
+    public string BlockedCountText       => $"{Processes.Count(p => p.IsBlocked)} blocked";
 
-    partial void OnGlobalUploadSpeedChanged(double value)  => OnPropertyChanged(nameof(GlobalUploadText));
-    partial void OnGlobalDownloadSpeedChanged(double value) => OnPropertyChanged(nameof(GlobalDownloadText));
-    partial void OnGlobalTotalDataUsedChanged(long value)  => OnPropertyChanged(nameof(GlobalTotalText));
+    partial void OnGlobalUploadSpeedChanged(double value)    => OnPropertyChanged(nameof(GlobalUploadText));
+    partial void OnGlobalDownloadSpeedChanged(double value)  => OnPropertyChanged(nameof(GlobalDownloadText));
+    partial void OnGlobalTotalDataUsedChanged(long value)    => OnPropertyChanged(nameof(GlobalTotalText));
+    partial void OnGlobalTotalSentChanged(long value)        => OnPropertyChanged(nameof(GlobalTotalSentText));
+    partial void OnGlobalTotalReceivedChanged(long value)    => OnPropertyChanged(nameof(GlobalTotalReceivedText));
 
     internal static string FormatSpeed(double kbps)
     {
@@ -303,6 +315,8 @@ public partial class MainViewModel : ObservableObject
                         if (!newConnKeys.Contains(key))
                             existingProc.Connections.RemoveAt(j);
                     }
+                    
+                    existingProc.RefreshConnectionStats();
                 }
                 else
                 {
@@ -355,6 +369,7 @@ public partial class MainViewModel : ObservableObject
                         newProc.Connections.Add(c);
                         EnrichGeoIp(c); // (#18)
                     }
+                    newProc.RefreshConnectionStats();
 
                     // Remove phantom placeholder if the real process appeared
                     var phantom = Processes.FirstOrDefault(p => p.IsPhantom &&
@@ -365,6 +380,18 @@ public partial class MainViewModel : ObservableObject
                         newProc.Notes = appNotes;
 
                     Processes.Add(newProc);
+
+                    if (!string.IsNullOrWhiteSpace(newProc.ProcessPath))
+                    {
+                        System.Threading.Tasks.Task.Run(async () =>
+                        {
+                            var img = await IconCache.GetIconAsync(newProc.ProcessPath);
+                            if (img != null)
+                            {
+                                _dispatcherQueue.TryEnqueue(() => newProc.AppIcon = img);
+                            }
+                        });
+                    }
 
                     // Re-apply firewall rule off the UI thread
                     if (newProc.IsBlocked && !string.IsNullOrWhiteSpace(newProc.ProcessPath))
@@ -605,6 +632,8 @@ public partial class MainViewModel : ObservableObject
         connection.BlockOutbound = doOut;
         connection.IsBlocked     = doIn || doOut;
 
+        process.RefreshConnectionStats();
+
         string procPath   = process.ProcessPath;
         string procName   = process.ProcessName;
         string remoteAddr = connection.RemoteAddress;
@@ -639,6 +668,37 @@ public partial class MainViewModel : ObservableObject
                 r.RemotePort == remotePort && r.LocalPort == localPort);
         }
         SaveConfig();
+        BlockedConnectionStore.NotifyBlockChange(procName, remoteAddr, remotePort, localPort, connection.IsBlocked);
+    }
+
+    /// <summary>
+    /// Keeps the live connection model and persisted state aligned when a
+    /// connection rule is removed directly from the Firewall page.
+    /// </summary>
+    public void RemoveConnectionBlockByEndpoint(string remoteAddress, int remotePort, int localPort)
+    {
+        if (string.IsNullOrWhiteSpace(remoteAddress)) return;
+
+        CurrentConfig.BlockedConnections.RemoveAll(record =>
+            string.Equals(record.RemoteAddress, remoteAddress, StringComparison.OrdinalIgnoreCase) &&
+            record.RemotePort == remotePort && record.LocalPort == localPort);
+
+        foreach (var process in Processes)
+        {
+            foreach (var connection in process.Connections.Where(connection =>
+                         string.Equals(connection.RemoteAddress, remoteAddress, StringComparison.OrdinalIgnoreCase) &&
+                         connection.RemotePort == remotePort && connection.LocalPort == localPort))
+            {
+                connection.IsBlocked = false;
+                connection.BlockInbound = false;
+                connection.BlockOutbound = false;
+            }
+            process.RefreshConnectionStats();
+        }
+
+        SaveConfig();
+        // An empty process name intentionally targets every process with this endpoint.
+        BlockedConnectionStore.NotifyBlockChange(string.Empty, remoteAddress, remotePort, localPort, false);
     }
 
     // ── Pin ───────────────────────────────────────────────────────────────────
@@ -861,7 +921,13 @@ public partial class MainViewModel : ObservableObject
             GlobalUploadSpeed   = totalUp;
             GlobalDownloadSpeed = totalDown;
             // Exclude phantoms from total data (they have no real traffic)
-            GlobalTotalDataUsed = Processes.Where(p => !p.IsPhantom).Sum(p => p.TotalDataUsed);
+            var nonPhantoms = Processes.Where(p => !p.IsPhantom).ToList();
+            GlobalTotalDataUsed  = nonPhantoms.Sum(p => p.TotalDataUsed);
+            // Sent = upload bytes, Received = download bytes (per-process accumulators from speed monitor)
+            GlobalTotalSent     = nonPhantoms.Sum(p =>
+                speedData.TryGetValue(p.ProcessId, out var si) ? si.TotalUploadBytes   : 0L);
+            GlobalTotalReceived = nonPhantoms.Sum(p =>
+                speedData.TryGetValue(p.ProcessId, out var si) ? si.TotalDownloadBytes : 0L);
 
             if (SelectedSort is "Upload Speed" or "Download Speed" or "Data Used (High-Low)")
                 ApplyFilterAndSort();

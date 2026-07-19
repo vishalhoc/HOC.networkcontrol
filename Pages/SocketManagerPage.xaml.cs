@@ -1,0 +1,400 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
+using WinNetControl.Core;
+using WinNetControl.ViewModels;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Windows.UI;
+
+namespace WinNetControl.Pages;
+
+public partial class SocketRow : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
+{
+    public string Proto         { get; set; } = "";
+    public string LocalAddress  { get; set; } = "";
+    public string RemoteAddress { get; set; } = "";
+    public string State         { get; set; } = "";
+    public string ProcessName   { get; set; } = "";
+    public string AppName       { get; set; } = "";
+    public string ProcessPath   { get; set; } = "";
+    public int    Pid           { get; set; }
+    public int    LocalPort     { get; set; }
+    public int    RemotePort    { get; set; }
+
+    [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+    private Microsoft.UI.Xaml.Media.ImageSource? _appIcon;
+
+    [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+    [CommunityToolkit.Mvvm.ComponentModel.NotifyPropertyChangedFor(nameof(ActionBrush), nameof(BlockBorderBrush), nameof(BlockIcon), nameof(BlockToolTip))]
+    private bool _isBlocked;
+
+    public SolidColorBrush ProtoBrush => Proto == "UDP"
+        ? new SolidColorBrush(Microsoft.UI.Colors.Orange)
+        : new SolidColorBrush(Microsoft.UI.Colors.SteelBlue);
+
+    public SolidColorBrush StateForeground => State switch
+    {
+        "LISTENING"    => new SolidColorBrush(Microsoft.UI.Colors.ForestGreen),
+        "ESTABLISHED"  => new SolidColorBrush(Microsoft.UI.Colors.DodgerBlue),
+        "TIME_WAIT"
+        or "CLOSE_WAIT" => new SolidColorBrush(Microsoft.UI.Colors.Goldenrod),
+        _              => new SolidColorBrush(Microsoft.UI.Colors.Gray)
+    };
+
+    public SolidColorBrush ActionBrush => IsBlocked
+        ? new SolidColorBrush(Microsoft.UI.Colors.Red)
+        : new SolidColorBrush(Microsoft.UI.Colors.Goldenrod);
+    public SolidColorBrush BlockBorderBrush => IsBlocked
+        ? new SolidColorBrush(Microsoft.UI.Colors.IndianRed)
+        : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+    public string BlockIcon => IsBlocked ? "\uE711" : "\uE72E";
+    public string BlockToolTip => IsBlocked ? "Unblock connection" : "Block connection";
+}
+
+public sealed partial class SocketManagerPage : Page
+{
+    private List<SocketRow>                          _all  = new();
+    private readonly ObservableCollection<SocketRow> _view = new();
+    private readonly Dictionary<int, string> _pidCache = new();
+    private readonly Dictionary<int, string> _pathCache = new();
+    private WinNetControl.ViewModels.MainViewModel? _viewModel;
+
+    private System.Threading.Timer? _autoTimer;
+
+    public SocketManagerPage() { this.InitializeComponent(); SocketList.ItemsSource = _view; }
+
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        if (e.Parameter is MainViewModel vm)
+            _viewModel = vm;
+        // Subscribe to cross-module sync
+        BlockedConnectionStore.ConnectionBlockChanged += OnExternalBlockChanged;
+        _ = LoadSocketsAsync();
+    }
+
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        base.OnNavigatedFrom(e);
+        BlockedConnectionStore.ConnectionBlockChanged -= OnExternalBlockChanged;
+        _autoTimer?.Dispose();
+        _autoTimer = null;
+    }
+
+    // ── External sync ─────────────────────────────────────────────────────────
+    private void OnExternalBlockChanged(string processName, string remoteIp, int remotePort, int localPort, bool isBlocked)
+    {
+        // Another module changed a block state — update matching rows in our list
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            foreach (var row in _all)
+            {
+                if ((string.IsNullOrWhiteSpace(processName) ||
+                     string.Equals(row.ProcessName, processName, StringComparison.OrdinalIgnoreCase)) &&
+                    StripPort(row.RemoteAddress) == remoteIp &&
+                    row.RemotePort == remotePort &&
+                    row.LocalPort == localPort)
+                {
+                    row.IsBlocked = isBlocked;
+                }
+            }
+        });
+    }
+
+    // ── Context menu (right-click socket row) ─────────────────────────────────
+    private void OnTraceRoute(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is SocketRow row)
+        {
+            string ip = StripPort(row.RemoteAddress);
+            if (string.IsNullOrEmpty(ip) || ip == "—") return;
+            if (_viewModel != null)
+                _viewModel.TargetPacketJourneyIp = ip;
+            var mainWindow = App.Window as MainWindow;
+            mainWindow?.NavigateTo("Journey");
+        }
+    }
+
+    private void OnCopyRemoteIp(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is SocketRow row)
+        {
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(StripPort(row.RemoteAddress));
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+        }
+    }
+
+    private void OnRefreshSockets(object sender, RoutedEventArgs e) => _ = LoadSocketsAsync();
+    private void OnProtoFilterChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
+    private void OnStateFilterChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
+    private void OnSocketSearch(object sender, TextChangedEventArgs e) => ApplyFilter();
+
+    private void OnRefreshRateChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _autoTimer?.Dispose();
+        _autoTimer = null;
+        if (RefreshRate?.SelectedItem is not ComboBoxItem item ||
+            !int.TryParse(item.Tag?.ToString(), out int seconds) || seconds <= 0) return;
+
+        _autoTimer = new System.Threading.Timer(_ =>
+            DispatcherQueue.TryEnqueue(() => _ = LoadSocketsAsync()), null,
+            TimeSpan.FromSeconds(seconds), TimeSpan.FromSeconds(seconds));
+    }
+
+    // ── Load ──────────────────────────────────────────────────────────────────
+    private async Task LoadSocketsAsync()
+    {
+        SocketStatus.Text = "Loading…";
+        _all = await Task.Run(() =>
+        {
+            // netstat -ano: all connections + owning PID
+            var psi = new ProcessStartInfo("netstat", "-ano")
+            {
+                RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)!;
+            string output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+
+            var rows = new List<SocketRow>();
+            foreach (var line in output.Split('\n'))
+            {
+                string t = line.Trim();
+                if (t.StartsWith("Proto", StringComparison.OrdinalIgnoreCase) || t.Length == 0) continue;
+
+                var parts = Regex.Split(t, @"\s+").Where(s => s.Length > 0).ToArray();
+                if (parts.Length < 4) continue;
+
+                string proto  = parts[0].ToUpperInvariant();
+                string local  = parts[1];
+                bool   hasTcp = proto == "TCP";
+                string remote = hasTcp && parts.Length >= 3 ? parts[2] : "—";
+                string state  = hasTcp && parts.Length >= 4 ? parts[3].ToUpperInvariant() : "";
+                int    pid    = 0;
+                if (hasTcp && parts.Length >= 5) int.TryParse(parts[4], out pid);
+                else if (!hasTcp && parts.Length >= 4) int.TryParse(parts[3], out pid);
+
+                rows.Add(new SocketRow
+                {
+                    Proto = proto, LocalAddress = local, RemoteAddress = remote,
+                    State = state, Pid = pid,
+                    LocalPort = ExtractPort(local),
+                    RemotePort = ExtractPort(remote)
+                });
+            }
+            return rows;
+        });
+
+        // Resolve PID → process names and paths in background
+        await Task.Run(() =>
+        {
+            foreach (var row in _all)
+            {
+                if (row.Pid == 0) continue;
+                if (!_pidCache.TryGetValue(row.Pid, out string? name))
+                {
+                    try 
+                    { 
+                        using var p = Process.GetProcessById(row.Pid);
+                        name = p.ProcessName; 
+                        _pathCache[row.Pid] = p.MainModule?.FileName ?? "";
+                    }
+                    catch { name = $"PID {row.Pid}"; _pathCache[row.Pid] = ""; }
+                    _pidCache[row.Pid] = name;
+                }
+                row.ProcessName = name;
+                row.ProcessPath = _pathCache.TryGetValue(row.Pid, out var path) ? path : "";
+                
+                if (!string.IsNullOrEmpty(row.ProcessPath))
+                {
+                    try
+                    {
+                        var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(row.ProcessPath);
+                        row.AppName = !string.IsNullOrWhiteSpace(fvi.FileDescription) ? fvi.FileDescription : row.ProcessName;
+                    }
+                    catch { row.AppName = row.ProcessName; }
+                }
+                else
+                {
+                    row.AppName = row.ProcessName;
+                }
+                
+                // Initialize block state
+                if (_viewModel != null && _viewModel.CurrentConfig != null)
+                {
+                    string remoteIp = StripPort(row.RemoteAddress);
+                    row.IsBlocked = BlockedConnectionStore.IsBlocked(row.ProcessName, remoteIp, row.RemotePort, row.LocalPort) ||
+                        _viewModel.CurrentConfig.BlockedConnections.Any(b =>
+                        b.ProcessName == row.ProcessName && b.RemoteAddress == remoteIp &&
+                        b.RemotePort == row.RemotePort && b.LocalPort == row.LocalPort);
+                }
+            }
+        });
+
+        // Load Icons (needs UI thread for ImageSource instantiation)
+        if (_viewModel != null)
+        {
+            foreach (var row in _all)
+            {
+                if (!string.IsNullOrEmpty(row.ProcessPath))
+                {
+                    _ = System.Threading.Tasks.Task.Run(async () =>
+                    {
+                        var img = await _viewModel.IconCache.GetIconAsync(row.ProcessPath);
+                        if (img != null)
+                        {
+                            App.DispatcherQueue.TryEnqueue(() => row.AppIcon = img);
+                        }
+                    });
+                }
+            }
+        }
+
+        ApplyFilter();
+        SocketCountText.Text = $"Live socket table · {_all.Count} sockets · refreshed {DateTime.Now:HH:mm:ss}";
+        SocketStatus.Text = "";
+    }
+
+    private static int ExtractPort(string addr)
+    {
+        if (string.IsNullOrEmpty(addr) || addr == "—") return 0;
+        int lastColon = addr.LastIndexOf(':');
+        if (lastColon >= 0 && lastColon < addr.Length - 1)
+        {
+            if (int.TryParse(addr.Substring(lastColon + 1), out int port))
+                return port;
+        }
+        return 0;
+    }
+
+    private void ApplyFilter()
+    {
+        if (SocketSearch == null || ProtoFilter == null || StateFilter == null) return;
+        string proto  = (ProtoFilter.SelectedItem  as ComboBoxItem)?.Content?.ToString() ?? "All";
+        string state  = (StateFilter.SelectedItem  as ComboBoxItem)?.Content?.ToString() ?? "All States";
+        string q      = SocketSearch.Text.Trim().ToLowerInvariant();
+
+        _view.Clear();
+        foreach (var row in _all)
+        {
+            if (proto != "All" && !row.Proto.Equals(proto, StringComparison.OrdinalIgnoreCase)) continue;
+            if (state != "All States" && !row.State.Equals(state, StringComparison.OrdinalIgnoreCase)) continue;
+            if (q.Length > 0 &&
+                !row.LocalAddress.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !row.RemoteAddress.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !row.ProcessName.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !row.Pid.ToString().Contains(q)) continue;
+            _view.Add(row);
+        }
+        SocketStatus.Text = $"{_view.Count} shown";
+    }
+
+    // ── Actions ───────────────────────────────────────────────────────────────
+    private async void OnKillProcess(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not int pid || pid == 0) return;
+        try
+        {
+            string name = _pidCache.TryGetValue(pid, out var n) ? n : pid.ToString();
+            var dlg = new ContentDialog
+            {
+                Title   = "Kill Process?",
+                Content = $"Kill process {name} (PID {pid})?",
+                PrimaryButtonText   = "Kill",
+                SecondaryButtonText = "Cancel",
+                XamlRoot = this.XamlRoot
+            };
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+            await Task.Run(() => Process.GetProcessById(pid).Kill());
+            SocketStatus.Text = $"✅ Process {name} (PID {pid}) killed.";
+            HistoryLogService.AddLog("Socket", name, $"Killed PID {pid}");
+            await LoadSocketsAsync();
+        }
+        catch (Exception ex) { SocketStatus.Text = $"Error: {ex.Message}"; }
+    }
+
+    private void OnBlockSocket(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not SocketRow row) return;
+
+        // Strip port correctly for both IPv4 and IPv6
+        string remoteIp = StripPort(row.RemoteAddress);
+
+        if (remoteIp is "—" or "0.0.0.0" or "::" or "" || string.IsNullOrEmpty(remoteIp))
+        {
+            SocketStatus.Text = "No valid remote IP to block."; return;
+        }
+
+        bool isNowBlocked = !row.IsBlocked;
+        row.IsBlocked = isNowBlocked;
+        SocketStatus.Text = isNowBlocked ? "Blocking…" : "Unblocking…";
+
+        bool syncSuccess = false;
+        if (_viewModel != null)
+        {
+            var process = _viewModel.Processes.FirstOrDefault(p => p.ProcessId == row.Pid);
+            if (process != null)
+            {
+                var conn = process.Connections.FirstOrDefault(c => 
+                    c.RemoteAddress == remoteIp && c.RemotePort == row.RemotePort && c.LocalPort == row.LocalPort);
+                    
+                if (conn == null)
+                {
+                    conn = new WinNetControl.Models.ProcessConnection
+                    {
+                        ProcessId = row.Pid,
+                        RemoteAddress = remoteIp,
+                        RemotePort = row.RemotePort,
+                        LocalPort = row.LocalPort,
+                        Protocol = row.Proto
+                    };
+                    process.Connections.Add(conn);
+                }
+                
+                _viewModel.ToggleConnectionBlock(conn, blockInbound: isNowBlocked, blockOutbound: isNowBlocked);
+                syncSuccess = true;
+            }
+        }
+
+        // If ViewModel couldn't handle it (e.g., process not yet monitored), fallback to FirewallService
+        if (!syncSuccess)
+        {
+            Task.Run(() => FirewallService.BlockConnection(row.ProcessPath, remoteIp, row.RemotePort, row.LocalPort, isNowBlocked, isNowBlocked));
+            SocketStatus.Text = isNowBlocked ? $"✅ {remoteIp} blocked for {row.ProcessName}." : $"✅ {remoteIp} unblocked for {row.ProcessName}.";
+            HistoryLogService.AddLog("Socket", row.ProcessName, $"{(isNowBlocked ? "Blocked" : "Unblocked")} connection {remoteIp}:{row.RemotePort}");
+        }
+
+        // ToggleConnectionBlock broadcasts the update. The fallback must do so itself.
+        if (!syncSuccess)
+            BlockedConnectionStore.NotifyBlockChange(row.ProcessName, remoteIp, row.RemotePort, row.LocalPort, isNowBlocked);
+        SocketStatus.Text = isNowBlocked
+            ? $"🛡 {remoteIp}:{row.RemotePort} blocked for {row.AppName}."
+            : $"✅ {remoteIp}:{row.RemotePort} unblocked for {row.AppName}.";
+    }
+
+    /// <summary>Strips port suffix from IPv4 (1.2.3.4:80) and IPv6 ([::1]:80 or ::1) addresses.</summary>
+    private static string StripPort(string addr)
+    {
+        if (string.IsNullOrEmpty(addr) || addr == "—") return addr;
+        // IPv6 bracket notation: [::1]:port  →  ::1
+        if (addr.StartsWith('['))
+        {
+            int end = addr.IndexOf(']');
+            return end > 0 ? addr[1..end] : addr;
+        }
+        // IPv4 with port: 1.2.3.4:80 — only strip if exactly one colon (not raw IPv6)
+        int colon = addr.LastIndexOf(':');
+        if (colon > 0 && addr.IndexOf(':') == colon)   // single colon = IPv4:port
+            return addr[..colon];
+        // Raw IPv6 without brackets — keep as-is
+        return addr;
+    }
+}

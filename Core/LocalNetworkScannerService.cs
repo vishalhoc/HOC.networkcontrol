@@ -9,6 +9,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Rssdp;
 
 namespace WinNetControl.Core;
 
@@ -23,6 +24,16 @@ public sealed class LocalNetworkDevice
     public bool   IsBlocked   { get; set; }
     public bool   IsGateway   { get; set; }
     public string DeviceType  { get; set; } = "Unknown";  // Router, PC, Phone, Printer…
+}
+
+/// <summary>Extra identity data advertised by a device through UPnP/SSDP.</summary>
+public sealed class LanServiceDiscovery
+{
+    public string IpAddress { get; init; } = "";
+    public string FriendlyName { get; init; } = "";
+    public string Manufacturer { get; init; } = "";
+    public string ModelName { get; init; } = "";
+    public string DeviceType { get; init; } = "";
 }
 
 public sealed class LocalNetworkScannerService
@@ -109,6 +120,43 @@ public sealed class LocalNetworkScannerService
         return results.OrderBy(d => ParseIP(d.IpAddress)).ToList();
     }
 
+    /// <summary>
+    /// Discovers UPnP/SSDP-capable devices (TVs, media players, cameras, routers
+    /// and other IoT devices) and returns their advertised identity information.
+    /// This is passive discovery and does not change any device configuration.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, LanServiceDiscovery>> DiscoverSsdpAsync(CancellationToken ct = default)
+    {
+        var results = new Dictionary<string, LanServiceDiscovery>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var locator = new SsdpDeviceLocator();
+            var devices = await locator.SearchAsync().WaitAsync(ct);
+            foreach (var device in devices)
+            {
+                if (device.DescriptionLocation == null ||
+                    !IPAddress.TryParse(device.DescriptionLocation.Host, out var address)) continue;
+
+                try
+                {
+                    var details = await device.GetDeviceInfo().WaitAsync(ct);
+                    results[address.ToString()] = new LanServiceDiscovery
+                    {
+                        IpAddress = address.ToString(),
+                        FriendlyName = details.FriendlyName ?? "",
+                        Manufacturer = details.Manufacturer ?? "",
+                        ModelName = details.ModelName ?? "",
+                        DeviceType = details.DeviceType ?? ""
+                    };
+                }
+                catch { /* Some devices advertise invalid or unavailable descriptions. */ }
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { /* SSDP can be disabled by the access point; regular scan still works. */ }
+        return results;
+    }
+
     private async Task<LocalNetworkDevice?> ProbeDeviceAsync(
         string ip, string? gateway, CancellationToken ct)
     {
@@ -134,7 +182,7 @@ public sealed class LocalNetworkScannerService
                 IsOnline   = true,
                 LatencyMs  = reply.RoundtripTime,
                 IsGateway  = ip == gateway,
-                IsBlocked  = IsIpBlocked(ip),
+                IsBlocked  = IsDeviceBlocked(ip),
             };
         }
         catch { return null; }
@@ -155,7 +203,7 @@ public sealed class LocalNetworkScannerService
         RunNetsh($"advfirewall firewall delete rule name=\"{ruleName}_in\"");
     }
 
-    private static bool IsIpBlocked(string ip)
+    public static bool IsDeviceBlocked(string ip)
     {
         string ruleName = $"WNC_Block_{ip.Replace('.', '_')}";
         var psi = new ProcessStartInfo("netsh",
@@ -167,7 +215,7 @@ public sealed class LocalNetworkScannerService
         };
         using var p = Process.Start(psi);
         string output = p?.StandardOutput.ReadToEnd() ?? "";
-        return output.Contains(ruleName);
+        return output.Contains(ruleName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void RunNetsh(string args)

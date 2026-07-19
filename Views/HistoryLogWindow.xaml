@@ -1,0 +1,57 @@
+<Window
+    x:Class="WinNetControl.Views.HistoryLogWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:WinNetControl.Views"
+    xmlns:models="using:WinNetControl.Models"
+    mc:Ignorable="d"
+    Title="History Log">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Padding="12" Spacing="8">
+            <FontIcon Glyph="&#xE81C;" FontSize="20"/>
+            <TextBlock Text="Event History Log" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <Button Content="Clear Log" Click="OnClearClicked" Margin="20,0,0,0"/>
+        </StackPanel>
+
+        <ListView x:Name="LogList" Grid.Row="1" Margin="12,0,12,12">
+            <ListView.Header>
+                <Grid Padding="8,4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Timestamp" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="2" Text="App / Process" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="3" Text="Details" FontWeight="SemiBold"/>
+                </Grid>
+            </ListView.Header>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="models:HistoryLogEntry">
+                    <Grid Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="200"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind TimestampString}" FontFamily="Consolas"/>
+                        <TextBlock Grid.Column="1" Text="{x:Bind EventType}"/>
+                        <TextBlock Grid.Column="2" Text="{x:Bind AppName}" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="3" Text="{x:Bind Details}" Foreground="Gray"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</Window>

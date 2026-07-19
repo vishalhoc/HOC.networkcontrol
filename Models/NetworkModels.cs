@@ -66,6 +66,19 @@ public partial class ProcessConnection : ObservableObject
         "12" => "INACTIVE",
         _    => string.IsNullOrWhiteSpace(State) ? "N/A" : State.ToUpperInvariant()
     };
+
+    public bool IsSuspicious
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(RemoteAddress) || RemoteAddress == "*") return false;
+            // Simple heuristic for demo: Ports associated with suspicious activity or direct IP without DNS
+            int[] suspiciousPorts = { 4444, 3389, 22, 23, 6667 };
+            foreach (var p in suspiciousPorts)
+                if (RemotePort == p) return true;
+            return false;
+        }
+    }
 }
 
 public partial class ProcessNetworkInfo : ObservableObject
@@ -74,6 +87,7 @@ public partial class ProcessNetworkInfo : ObservableObject
     [ObservableProperty] private string _processName = string.Empty;
     [ObservableProperty] private string _processPath = string.Empty;
     [ObservableProperty] private string _appType     = string.Empty;
+    [ObservableProperty] private Microsoft.UI.Xaml.Media.ImageSource? _appIcon;
 
     // Is this a phantom (offline / not currently running) entry kept for blocked-app display?
     [ObservableProperty] private bool _isPhantom;
@@ -153,6 +167,16 @@ public partial class ProcessNetworkInfo : ObservableObject
     public System.Collections.Generic.List<ProcessConnection> CurrentConnections { get; set; } = new();
 
     public int ConnectionCount => Connections.Count;
+    public int BlockedConnectionCount => System.Linq.Enumerable.Count(Connections, c => c.IsBlocked);
+    public string ConnectionStatsText => $"{ConnectionCount} sockets ({BlockedConnectionCount} blocked)";
+    public void RefreshConnectionStats() => OnPropertyChanged(nameof(ConnectionStatsText));
+
+    // ── Launch Count and Parent Process (#31, #32) ───────────────────────────
+    private int _launchCount = 1;
+    public int LaunchCount { get => _launchCount; set => SetProperty(ref _launchCount, value); }
+
+    private string _parentProcessName = "Unknown";
+    public string ParentProcessName { get => _parentProcessName; set => SetProperty(ref _parentProcessName, value); }
 
     // ── Sparkline history (#13) ───────────────────────────────────────────────
     // Rolling 30-point window of combined (upload+download) KB/s readings
@@ -164,8 +188,18 @@ public partial class ProcessNetworkInfo : ObservableObject
     {
         _speedHistory[_speedHistoryIdx % 30] = combinedKbps;
         _speedHistoryIdx++;
+        if (combinedKbps > 0)
+        {
+            LastActiveTime = System.DateTime.Now;
+        }
         OnPropertyChanged(nameof(SpeedHistory));
+        OnPropertyChanged(nameof(IsIdle));
     }
+
+    private System.DateTime _lastActiveTime = System.DateTime.Now;
+    public System.DateTime LastActiveTime { get => _lastActiveTime; set => SetProperty(ref _lastActiveTime, value); }
+    
+    public bool IsIdle => (System.DateTime.Now - LastActiveTime).TotalMinutes > 5;
 
     // ── Suspicious flag (#26) ─────────────────────────────────────────────────
     private bool _isSuspicious;
@@ -219,9 +253,35 @@ public partial class HttpRequestInfo : ObservableObject
         ? (ResponseSize < 1024 ? $"{ResponseSize} B" : $"{ResponseSize / 1024.0:F1} KB") : "—";
 
     // Cascade notifications to computed properties when backing fields change
-    partial void OnStatusCodeChanged(int value)       => OnPropertyChanged(nameof(StatusText));
-    partial void OnResponseSizeChanged(long value)    => OnPropertyChanged(nameof(SizeText));
-    partial void OnTimestampChanged(System.DateTime value)   => OnPropertyChanged(nameof(TimeText));
+    partial void OnStatusCodeChanged(int value)
+    {
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColorHex));
+        OnPropertyChanged(nameof(RowColorHex));
+    }
+    partial void OnResponseSizeChanged(long value)         => OnPropertyChanged(nameof(SizeText));
+    partial void OnTimestampChanged(System.DateTime value) => OnPropertyChanged(nameof(TimeText));
+    partial void OnMethodChanged(string value)             => OnPropertyChanged(nameof(MethodColorHex));
+
+    // ── Colour hex strings for XAML bindings (no WinUI dependency in model) ──
+    public string RowColorHex    => StatusCode >= 400 ? "#0EF44336" : StatusCode >= 300 ? "#0EFF9800" : "Transparent";
+    public string MethodColorHex => Method switch
+    {
+        "GET"    => "#2196F3",
+        "POST"   => "#4CAF50",
+        "PUT"    => "#FF9800",
+        "DELETE" => "#F44336",
+        "PATCH"  => "#9C27B0",
+        _        => "#808080"
+    };
+    public string StatusColorHex => StatusCode switch
+    {
+        >= 500 => "#F44336",
+        >= 400 => "#FF9800",
+        >= 300 => "#2196F3",
+        >= 200 => "#4CAF50",
+        _      => "#808080"
+    };
 }
 
 public partial class NetworkAdapterInfo : ObservableObject

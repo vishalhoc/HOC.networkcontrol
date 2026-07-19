@@ -61,6 +61,8 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.4.0" />
+    <PackageReference Include="Rssdp" Version="5.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
     <PackageReference Include="Titanium.Web.Proxy" Version="3.2.0" />
     <PackageReference Include="WinDivertSharp" Version="1.4.3.2" />
     <PackageReference Include="WinUIEx" Version="2.9.1" />
@@ -93,5 +95,7 @@
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
     <PublishTrimmed>False</PublishTrimmed>
+    <!-- Ship the .NET runtime with release builds so end users are not prompted to install it. -->
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
   </PropertyGroup>
 </Project>

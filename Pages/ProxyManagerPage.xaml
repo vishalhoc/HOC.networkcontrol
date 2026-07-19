@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="WinNetControl.Pages.ProxyManagerPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Padding="20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                    <FontIcon Glyph="&#xEDA4;" FontSize="22" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Proxy Manager" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="HTTP/HTTPS Proxy · System proxy control · Traffic capture" FontSize="12" Foreground="Gray"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="14" Padding="16,14,16,24">
+
+                <!-- Live system proxy status -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="System Proxy Status" FontSize="13" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Status" FontSize="11" Foreground="Gray"/>
+                                    <TextBlock x:Name="ProxyStatusBadge" FontSize="13" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Server" FontSize="11" Foreground="Gray"/>
+                                    <TextBlock x:Name="ProxyServerText" FontSize="12" IsTextSelectionEnabled="True"/>
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Bypass" FontSize="11" Foreground="Gray"/>
+                                    <TextBlock x:Name="ProxyBypassText" FontSize="12" IsTextSelectionEnabled="True"/>
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Capture Proxy" FontSize="11" Foreground="Gray"/>
+                                    <TextBlock x:Name="CaptureStatusText" FontSize="12"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                        <Button Grid.Column="1" Padding="10,6" Click="OnRefreshStatus" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- WinNetControl capture proxy -->
+                    <Border CornerRadius="12" Padding="16"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="WNC Traffic Capture Proxy" FontSize="13" FontWeight="SemiBold"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                    Text="Starts an HTTPS-decrypting proxy on port 8080. Routes all browser traffic through WNC for inspection. Requires certificate trust."/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Padding="12,8" Click="OnStartCapture"
+                                        Style="{ThemeResource AccentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE102;" FontSize="13"/>
+                                        <TextBlock Text="Start (set as system proxy)"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="12,8" Click="OnStartCaptureNoProxy">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE102;" FontSize="13"/>
+                                        <TextBlock Text="Start (capture only)"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                            <Button Padding="12,8" Click="OnStopCapture" HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE15B;" FontSize="13" Foreground="#E02020"/>
+                                    <TextBlock Text="Stop Capture Proxy"/>
+                                </StackPanel>
+                            </Button>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Padding="10,6" Click="OnInstallCert" FontSize="11">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon Glyph="&#xE8D7;" FontSize="12"/>
+                                        <TextBlock Text="Install Root Cert" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="10,6" Click="OnRemoveCert" FontSize="11">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="12"/>
+                                        <TextBlock Text="Remove Cert" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- System proxy direct config -->
+                    <Border Grid.Column="1" CornerRadius="12" Padding="16"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="System Proxy Configuration" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBox x:Name="ProxyHostBox" Header="Proxy Host:Port"
+                                     PlaceholderText="e.g. 192.168.1.1:3128"/>
+                            <TextBox x:Name="ProxyBypassBox" Header="Bypass list (semicolon separated)"
+                                     PlaceholderText="localhost;*.local;192.168.*"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Padding="12,8" Click="OnSetSystemProxy"
+                                        Style="{ThemeResource AccentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE74E;" FontSize="13"/>
+                                        <TextBlock Text="Apply System Proxy"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="12,8" Click="OnClearSystemProxy">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE894;" FontSize="13"/>
+                                        <TextBlock Text="Clear Proxy"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Captured requests -->
+                <Border CornerRadius="12" Padding="0"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="220"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Padding="14,10"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBlock Text="Captured Requests" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="RequestCountText" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" HorizontalAlignment="Right" Padding="8,5" Click="OnClearRequests">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="12"/>
+                                        <TextBlock Text="Clear" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <ListView x:Name="RequestsList" Grid.Row="1" SelectionMode="Single">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="14,5"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="50"/>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="70"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding TimestampStr}" FontSize="10" Foreground="Gray" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="1" CornerRadius="4" Padding="4,2"
+                                                Background="#200078D4" HorizontalAlignment="Left">
+                                            <TextBlock Text="{Binding Method}" FontSize="10"
+                                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                        </Border>
+                                        <TextBlock Grid.Column="2" Text="{Binding Url}"
+                                                   FontSize="11" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding ProcessName}"
+                                                   FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding StatusCode}"
+                                                   FontSize="11" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="5" Text="{Binding ResponseSizeStr}"
+                                                   FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Border>
+
+                <!-- Status -->
+                <TextBlock x:Name="ProxyActionStatus" Text="" FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

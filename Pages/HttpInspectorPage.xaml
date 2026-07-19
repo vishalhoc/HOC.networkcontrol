@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinNetControl.Pages.HttpInspectorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Header ─────────────────────────────────────────────────────── -->
+        <Border Grid.Row="0" Padding="20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Border CornerRadius="10" Padding="10"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <FontIcon Glyph="&#xE8C4;" FontSize="22"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="HTTP Inspector" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="Intercept and inspect HTTP/HTTPS traffic through the built-in proxy."
+                                   FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Border CornerRadius="16" Padding="10,4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE9F5;" FontSize="13" Foreground="#2196F3"/>
+                            <TextBlock x:Name="CountBar" Text="0 requests" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="16" Padding="10,4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xEBD2;" FontSize="13" Foreground="#4CAF50"/>
+                            <TextBlock x:Name="SizeBar" Text="" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── Proxy status panel ─────────────────────────────────────────── -->
+        <Border Grid.Row="1" Padding="16,10"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Ellipse x:Name="ProxyDot" Width="10" Height="10"
+                             Fill="{ThemeResource SystemFillColorNeutralBrush}"/>
+                    <StackPanel Spacing="1">
+                        <TextBlock x:Name="ProxyServerText" FontSize="12" FontWeight="SemiBold"
+                                   Text="Checking proxy…"/>
+                        <TextBlock x:Name="ProxyDetailText" FontSize="11" Foreground="Gray"
+                                   Text="" TextWrapping="Wrap" MaxWidth="400"/>
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Grid.Column="1" x:Name="CaptureAppsText" FontSize="11"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" Margin="20,0"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTipService.ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                    <Button Click="OnEnableSystemProxy" Padding="10,5" ToolTipService.ToolTip="Set system proxy to 127.0.0.1">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE701;" FontSize="13"/>
+                            <TextBlock Text="Enable Proxy" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnDisableSystemProxy" Padding="10,5" ToolTipService.ToolTip="Remove system proxy">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE711;" FontSize="13"/>
+                            <TextBlock Text="Disable Proxy" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnInstallCert" Padding="10,5" ToolTipService.ToolTip="Install HTTPS MITM certificate">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE72E;" FontSize="13"/>
+                            <TextBlock Text="Install Cert" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="OnFixConnectivity" Padding="10,5"
+                            ToolTipService.ToolTip="Emergency: clear stuck proxy from registry">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="13" Foreground="#F44336"/>
+                            <TextBlock Text="Fix Connectivity" FontSize="12" Foreground="#F44336"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── Offline warning banner ─────────────────────────────────────── -->
+        <Border Grid.Row="2" x:Name="OfflineBanner" Visibility="Collapsed"
+                Padding="16,8" Background="#FFF3E0"
+                BorderBrush="#FF9800" BorderThickness="0,0,0,2">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="#E65100"/>
+                <TextBlock FontSize="12" Foreground="#E65100" VerticalAlignment="Center"
+                           Text="⚠  System proxy is pointed at our interceptor but capture is STOPPED — apps may have no internet. Click 'Fix Connectivity' to clear."/>
+            </StackPanel>
+        </Border>
+
+        <!-- ── Toolbar + list ─────────────────────────────────────────────── -->
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Toolbar -->
+            <Border Padding="16,8"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Click="OnStartCapture" Padding="12,6"
+                            Style="{ThemeResource AccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon x:Name="HttpCaptureIcon" Glyph="&#xE102;" FontSize="14"/>
+                            <TextBlock x:Name="HttpCaptureBtnText" Text="Start Capture"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Click="OnClearRequests" Padding="10,6" Margin="6,0,0,0"
+                            ToolTipService.ToolTip="Clear all captured requests">
+                        <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                    </Button>
+                    <Button Grid.Column="2" Click="OnExportCsv" Padding="10,6" Margin="6,0,0,0"
+                            ToolTipService.ToolTip="Export to CSV">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE9F9;" FontSize="14"/>
+                            <TextBlock Text="Export CSV"/>
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Grid.Column="3" Width="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,2"/>
+                    <TextBox x:Name="FilterBox" Grid.Column="4"
+                             PlaceholderText="Filter by host, URL, method, or app name…"
+                             TextChanged="OnFilterChanged" VerticalAlignment="Center"/>
+                    <Rectangle Grid.Column="5" Width="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,2"/>
+                    <ToggleSwitch x:Name="CaptureAllToggle" Grid.Column="6"
+                                  Header="" OnContent="All apps" OffContent="Per-app"
+                                  IsOn="True" Toggled="OnCaptureAllToggled"
+                                  VerticalAlignment="Center" MinWidth="0"/>
+                    <ToggleButton x:Name="AutoScrollToggle" Grid.Column="7" Margin="6,0,0,0"
+                                  IsChecked="True" ToolTipService.ToolTip="Auto-scroll to newest">
+                        <FontIcon Glyph="&#xE74B;" FontSize="14"/>
+                    </ToggleButton>
+                </Grid>
+            </Border>
+
+            <!-- Request list -->
+            <ListView x:Name="RequestsListView" Grid.Row="1"
+                      SelectionMode="Single" IsItemClickEnabled="False"
+                      FontFamily="Consolas" FontSize="12">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0,1"/>
+                        <Setter Property="MinHeight" Value="0"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.Header>
+                    <Grid Background="{ThemeResource LayerFillColorDefaultBrush}"
+                          Padding="12,6" BorderThickness="0,0,0,1"
+                          BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="55"/>
+                            <ColumnDefinition Width="200"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="70"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Time"    FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="1" Text="App"     FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="2" Text="Method"  FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="3" Text="Host"    FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="4" Text="URL"     FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="5" Text="Status"  FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock Grid.Column="6" Text="Size"    FontWeight="SemiBold" FontSize="11"/>
+                    </Grid>
+                </ListView.Header>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="12,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="55"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="70"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding TimeText}"   TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ProcessName}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Method}"     TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="3" Text="{Binding Host}"       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="4" Text="{Binding Url}"        TextTrimming="CharacterEllipsis" Opacity="0.75"/>
+                            <TextBlock Grid.Column="5" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="6" Text="{Binding SizeText}"   TextTrimming="CharacterEllipsis"/>
+                            <Grid.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="Copy URL"        Click="OnCopyUrl"/>
+                                    <MenuFlyoutItem Text="Copy Host"       Click="OnCopyHost"/>
+                                    <MenuFlyoutItem Text="Open in Browser" Click="OnOpenInBrowser"/>
+                                    <MenuFlyoutSeparator/>
+                                    <MenuFlyoutItem Text="Block host in Hosts file" Click="OnBlockHost"/>
+                                    <MenuFlyoutItem Text="Block in Firewall (port 80+443)" Click="OnBlockFirewall"/>
+                                    <MenuFlyoutItem Text="Block in Both (Hosts + Firewall)" Click="OnBlockBoth"/>
+                                </MenuFlyout>
+                            </Grid.ContextFlyout>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+
+        <!-- ── Status bar ─────────────────────────────────────────────────── -->
+        <Border Grid.Row="4" Padding="16,6"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <TextBlock x:Name="StatusBar" Text="Ready." FontSize="11" Foreground="Gray"/>
+        </Border>
+    </Grid>
+</Page>

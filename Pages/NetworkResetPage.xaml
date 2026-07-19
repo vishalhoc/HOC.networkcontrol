@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinNetControl.Pages.NetworkResetPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Padding="20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                    <FontIcon Glyph="&#xE777;" FontSize="22" Foreground="#E02020"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Network Reset" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="Winsock · TCP/IP · DNS · DHCP · Firewall policy" FontSize="12" Foreground="Gray"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" Padding="16,14,16,20">
+            <StackPanel Spacing="14" MaxWidth="680" HorizontalAlignment="Center">
+
+                <!-- Warning card -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="#1AE02020"
+                        BorderBrush="#40E02020" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <FontIcon Glyph="&#xE7BA;" FontSize="24" Foreground="#E02020" VerticalAlignment="Top"/>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Administrator privileges required" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
+                                       Text="All reset operations run with elevated privileges. A system restart may be required for changes to take full effect."/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Reset button -->
+                <Button HorizontalAlignment="Stretch" Padding="16,12"
+                        Click="OnRunReset" x:Name="ResetAllBtn">
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                        <FontIcon Glyph="&#xE777;" FontSize="18" Foreground="#E02020"/>
+                        <StackPanel>
+                            <TextBlock Text="Full Network Reset" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Text="Winsock · TCP/IP · DNS · DHCP · Firewall" FontSize="11" Foreground="Gray"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Button>
+
+                <!-- Progress -->
+                <ProgressBar x:Name="ResetProgress" IsIndeterminate="True"
+                             Visibility="Collapsed" Height="4"/>
+
+                <!-- Log output -->
+                <Border CornerRadius="12" Padding="0"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel>
+                        <Border Padding="14,10"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                            <TextBlock Text="Reset Log" FontSize="12" FontWeight="SemiBold"/>
+                        </Border>
+                        <ScrollViewer Height="300" Padding="14,10">
+                            <TextBlock x:Name="ResetLog"
+                                       FontFamily="Cascadia Code, Consolas"
+                                       FontSize="12" TextWrapping="Wrap"
+                                       IsTextSelectionEnabled="True"
+                                       Text="Click 'Full Network Reset' to begin…"/>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

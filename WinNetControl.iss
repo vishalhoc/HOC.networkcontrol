@@ -1,11 +1,12 @@
 [Setup]
+#define MyAppVersion "2.2.2"
 AppName=WinNetControl
-AppVersion=2.1.0
+AppVersion={#MyAppVersion}
 AppPublisher=Vishal
 AppPublisherURL=https://github.com/vishalhoc/HOC.networkcontrol
 DefaultDirName={autopf}\WinNetControl
 DefaultGroupName=WinNetControl
-OutputBaseFilename=WinNetControl_Setup_v2.1.0
+OutputBaseFilename=WinNetControl_Setup_{#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 SetupIconFile=Assets\AppIcon.ico
