@@ -219,11 +219,9 @@ public sealed partial class SecurityPage : Page
 
     private static Task RunElevatedAsync(string exe, string args) => Task.Run(() =>
     {
-        var psi = new System.Diagnostics.ProcessStartInfo(exe, args)
-        {
-            Verb = "runas", UseShellExecute = true,
-            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-        };
-        System.Diagnostics.Process.Start(psi)?.WaitForExit();
+        if (exe.Equals("netsh", StringComparison.OrdinalIgnoreCase))
+            ElevatedRunner.RunNetsh(args);
+        else
+            ElevatedRunner.RunPowerShell(args);
     });
 }

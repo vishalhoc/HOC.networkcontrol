@@ -89,6 +89,17 @@ public partial class ProcessNetworkInfo : ObservableObject
     [ObservableProperty] private string _appType     = string.Empty;
     [ObservableProperty] private Microsoft.UI.Xaml.Media.ImageSource? _appIcon;
 
+    // Used beneath the extracted executable icon, and remains visible for
+    // protected Windows processes or offline entries that have no file path.
+    public string AppIconGlyph => ProcessName.ToLowerInvariant() switch
+    {
+        var name when name.Contains("chrome") || name.Contains("msedge") || name.Contains("firefox") || name.Contains("opera") => "\uE774",
+        var name when name.Contains("explorer") => "\uE8B7",
+        var name when name.Contains("service") || name.Contains("system") || name.Contains("svchost") => "\uE713",
+        var name when name.Contains("powershell") || name.Contains("cmd") || name.Contains("terminal") => "\uE756",
+        _ => "\uE8A5"
+    };
+
     // Is this a phantom (offline / not currently running) entry kept for blocked-app display?
     [ObservableProperty] private bool _isPhantom;
 
@@ -302,5 +313,4 @@ public partial class NetworkAdapterInfo : ObservableObject
 
     public System.Action? SelectionChanged { get; set; }
 }
-
 

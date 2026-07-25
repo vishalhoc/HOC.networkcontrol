@@ -126,6 +126,8 @@ public sealed partial class MainWindow : Window
             "Dns"           => typeof(DnsManagerPage),
             "Hosts"         => typeof(HostsManagerPage),
             "Wireless"      => typeof(WirelessPage),
+            "WifiPentest"   => typeof(WifiPentestPage),
+            "Hashcat"       => typeof(HashcatPage),
             "Firewall"      => typeof(FirewallPage),
             "Security"      => typeof(SecurityPage),
             "Proxy"         => typeof(ProxyManagerPage),

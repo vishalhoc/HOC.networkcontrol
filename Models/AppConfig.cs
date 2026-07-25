@@ -55,6 +55,19 @@ public class AppConfig
     // App theme: "System" | "Light" | "Dark"
     public string AppTheme { get; set; } = "System";
 
+    // Appearance extras
+    public bool EnableAcrylic    { get; set; } = false;
+    public bool EnableAnimations { get; set; } = true;
+
+    // Startup behaviour
+    public bool StartMinimized { get; set; } = false;
+
+    // Notifications
+    public bool   NotifyOnBlock       { get; set; } = true;
+    public bool   NotifyOnHighUsage   { get; set; } = false;
+    public bool   NotifyOnQos         { get; set; } = false;
+    public double BandwidthThresholdMBps { get; set; } = 10.0;
+
     // Per-process data limits in bytes (0 = no limit)
     public Dictionary<string, long> DataLimits { get; set; } = new();
 

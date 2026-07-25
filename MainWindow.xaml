@@ -201,6 +201,43 @@
                     </NavigationViewItem.Content>
                 </NavigationViewItem>
 
+                <!-- ── PENTESTING ── -->
+                <NavigationViewItemHeader Content="PENTESTING"/>
+
+                <NavigationViewItem x:Name="NavWifiPentest"
+                                    Tag="WifiPentest"
+                                    ToolTipService.ToolTip="Wi-Fi Pentesting — Aircrack-ng / Hashcat via WSL">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8FB;"/>
+                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="Wi-Fi Pentest"/>
+                            <Border CornerRadius="3" Padding="4,1"
+                                    Background="#22E81123" BorderBrush="#44E81123" BorderThickness="1">
+                                <TextBlock Text="EDU" FontSize="9" FontWeight="Bold" Foreground="#E81123"/>
+                            </Border>
+                        </StackPanel>
+                    </NavigationViewItem.Content>
+                </NavigationViewItem>
+
+                <NavigationViewItem x:Name="NavHashcat"
+                                    Tag="Hashcat"
+                                    ToolTipService.ToolTip="Hashcat — Native Windows GPU password cracker (no WSL needed)">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8D4;"/>
+                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="GPU Cracker"/>
+                            <Border CornerRadius="3" Padding="4,1"
+                                    Background="#220078D4" BorderBrush="#440078D4" BorderThickness="1">
+                                <TextBlock Text="WIN" FontSize="9" FontWeight="Bold" Foreground="#0078D4"/>
+                            </Border>
+                        </StackPanel>
+                    </NavigationViewItem.Content>
+                </NavigationViewItem>
+
                 <!-- ── SECURITY ── -->
                 <NavigationViewItemHeader Content="SECURITY"/>
 

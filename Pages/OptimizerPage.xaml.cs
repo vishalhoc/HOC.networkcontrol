@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using WinNetControl.Core;
 using WinNetControl.ViewModels;
 using System;
 using System.Threading.Tasks;
@@ -164,37 +165,13 @@ public sealed partial class OptimizerPage : Page
     private void Log(string msg) =>
         DispatcherQueue.TryEnqueue(() => OptLog.Text += $"[{DateTime.Now:HH:mm:ss}] {msg}\n");
 
-    private static Task Netsh(string args) => Task.Run(() =>
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo("netsh", args)
-        {
-            Verb = "runas", UseShellExecute = true,
-            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-        };
-        System.Diagnostics.Process.Start(psi)?.WaitForExit();
-    });
+    private static Task Netsh(string args) => Task.Run(() => ElevatedRunner.RunNetsh(args));
 
     private static Task RegWrite(string key, string name, string type, string value) => Task.Run(() =>
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo(
-            "reg", $"add \"{key}\" /v {name} /t {type} /d {value} /f")
-        {
-            Verb = "runas", UseShellExecute = true,
-            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-        };
-        System.Diagnostics.Process.Start(psi)?.WaitForExit();
-    });
+        ElevatedRunner.RunPowerShell($"Set-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\\{key.Replace("HKLM\\", "")}' -Name '{name}' -Value '{value}' -Type {(type.Contains("DWORD") ? "DWord" : "String")} -Force"));
 
     private static Task RegDelete(string key, string name) => Task.Run(() =>
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo(
-            "reg", $"delete \"{key}\" /v {name} /f")
-        {
-            Verb = "runas", UseShellExecute = true,
-            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-        };
-        System.Diagnostics.Process.Start(psi)?.WaitForExit();
-    });
+        ElevatedRunner.RunPowerShell($"Remove-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\\{key.Replace("HKLM\\", "")}' -Name '{name}' -Force -ErrorAction SilentlyContinue"));
 
     private static Task<string> RunAsync(string exe, string args) => Task.Run(() =>
     {

@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinNetControl.Pages.HashcatPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ PAGE HEADER ═══ -->
+        <Border Grid.Row="0" Padding="20,16,20,14"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                    <Border CornerRadius="10" Width="38" Height="38"
+                            Background="#220078D4" BorderBrush="#440078D4" BorderThickness="1">
+                        <FontIcon Glyph="&#xE8D4;" FontSize="18" Foreground="#0078D4"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Hashcat — GPU Password Cracker" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock FontSize="11" Foreground="Gray">
+                            <Run Text="Native Windows ·"/>
+                            <Run Text=" No WSL · No USB adapter needed · GPU accelerated"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Status badges -->
+                    <Border x:Name="HashcatStatusBadge" CornerRadius="6" Padding="10,3"
+                            Background="#220078D4" BorderBrush="#440078D4" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <Ellipse x:Name="HashcatStatusDot" Width="7" Height="7" Fill="#0078D4"/>
+                            <TextBlock x:Name="HashcatStatusText" Text="Checking…" FontSize="11" FontWeight="SemiBold" Foreground="#0078D4"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- GPU badge -->
+                    <Border x:Name="GpuBadge" CornerRadius="6" Padding="10,3"
+                            Background="#22107C10" BorderBrush="#44107C10" BorderThickness="1"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE950;" FontSize="11" Foreground="#107C10"/>
+                            <TextBlock x:Name="GpuBadgeText" Text="GPU Ready" FontSize="11" FontWeight="SemiBold" Foreground="#107C10"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Right: actions -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button x:Name="DownloadHashcatBtn" Padding="10,6" Click="OnDownloadHashcat"
+                            Style="{ThemeResource AccentButtonStyle}"
+                            ToolTipService.ToolTip="Download latest Hashcat binaries for Windows">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon x:Name="DownloadIcon" Glyph="&#xE896;" FontSize="13"/>
+                            <TextBlock x:Name="DownloadBtnText" Text="Download Hashcat" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Padding="10,6" Click="OnCheckGpu"
+                            ToolTipService.ToolTip="Detect GPU devices available for cracking">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE950;" FontSize="13"/>
+                            <TextBlock Text="GPU Info" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Padding="10,6" Click="OnOpenHashcatFolder"
+                            ToolTipService.ToolTip="Open Hashcat installation folder">
+                        <FontIcon Glyph="&#xED43;" FontSize="13"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ═══ MAIN CONTENT ═══ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380" MinWidth="320"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ═══ LEFT PANEL — Configuration ═══ -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto"
+                          BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                          BorderThickness="0,0,1,0">
+                <StackPanel Spacing="12" Padding="14,14,14,28">
+
+                    <!-- DOWNLOAD / SETUP -->
+                    <Border x:Name="SetupBanner" CornerRadius="10" Padding="14"
+                            Background="#220078D4" BorderBrush="#440078D4" BorderThickness="1">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE896;" FontSize="14" Foreground="#0078D4"/>
+                                <TextBlock Text="Setup" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="SetupStatusText"
+                                       Text="Hashcat not found. Click Download to get the latest version."
+                                       FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                            <ProgressBar x:Name="DownloadProgressBar" IsIndeterminate="False"
+                                         Value="0" Height="4" Visibility="Collapsed"/>
+                            <TextBlock x:Name="DownloadProgressText" FontSize="10" Foreground="Gray"
+                                       Visibility="Collapsed"/>
+                            <Button x:Name="SetupDownloadBtn" HorizontalAlignment="Stretch" Padding="0,8"
+                                    Style="{ThemeResource AccentButtonStyle}"
+                                    Click="OnDownloadHashcat">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE896;" FontSize="13"/>
+                                    <TextBlock Text="Download Hashcat (1-click)" FontSize="12" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- HASH / CAPTURE FILE -->
+                    <Border CornerRadius="10" Padding="14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border CornerRadius="12" Width="24" Height="24"
+                                        Background="#220078D4" BorderBrush="#440078D4" BorderThickness="1">
+                                    <TextBlock Text="1" FontSize="11" FontWeight="Bold" Foreground="#0078D4"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Hash / Capture File" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Hash file (.cap · .hc22000 · .hccapx · .txt)" FontSize="11" Foreground="Gray"/>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="HashFileBox" PlaceholderText="Path to hash or capture file…"
+                                             FontFamily="Consolas" FontSize="11"/>
+                                    <Button Grid.Column="1" Padding="10,6" Click="OnBrowseHashFile"
+                                            ToolTipService.ToolTip="Browse for hash/capture file">
+                                        <FontIcon Glyph="&#xED43;" FontSize="13"/>
+                                    </Button>
+                                </Grid>
+                                <!-- Convert .cap → .hc22000 button -->
+                                <Button HorizontalAlignment="Stretch" Padding="0,6" Click="OnConvertCap"
+                                        ToolTipService.ToolTip="Convert .cap to .hc22000 format using hcxtools (if available)">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE8AB;" FontSize="12" Foreground="#FF8C00"/>
+                                        <TextBlock Text="Convert .cap → .hc22000" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- WORDLIST -->
+                    <Border CornerRadius="10" Padding="14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border CornerRadius="12" Width="24" Height="24"
+                                        Background="#22107C10" BorderBrush="#44107C10" BorderThickness="1">
+                                    <TextBlock Text="2" FontSize="11" FontWeight="Bold" Foreground="#107C10"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Wordlist / Dictionary" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Wordlist file (.txt)" FontSize="11" Foreground="Gray"/>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="WordlistBox" PlaceholderText="Path to wordlist…"
+                                             FontFamily="Consolas" FontSize="11"/>
+                                    <Button Grid.Column="1" Padding="10,6" Click="OnBrowseWordlist">
+                                        <FontIcon Glyph="&#xED43;" FontSize="13"/>
+                                    </Button>
+                                </Grid>
+
+                                <!-- Popular wordlist downloads -->
+                                <TextBlock Text="Download common wordlists:" FontSize="11" Foreground="Gray" Margin="0,4,0,0"/>
+                                <Grid ColumnSpacing="6" RowSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <Button Grid.Column="0" Grid.Row="0" HorizontalAlignment="Stretch" Padding="0,6"
+                                            Click="OnDownloadRockyou"
+                                            ToolTipService.ToolTip="Download rockyou.txt (14M passwords) — most popular wordlist">
+                                        <StackPanel Spacing="2">
+                                            <FontIcon Glyph="&#xE896;" FontSize="11" Foreground="#0078D4"/>
+                                            <TextBlock Text="rockyou.txt" FontSize="10" TextAlignment="Center"/>
+                                            <TextBlock Text="14M passwords" FontSize="9" Foreground="Gray" TextAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Column="1" Grid.Row="0" HorizontalAlignment="Stretch" Padding="0,6"
+                                            Click="OnDownloadTop1M"
+                                            ToolTipService.ToolTip="Top 1M common passwords">
+                                        <StackPanel Spacing="2">
+                                            <FontIcon Glyph="&#xE896;" FontSize="11" Foreground="#0078D4"/>
+                                            <TextBlock Text="top-1m.txt" FontSize="10" TextAlignment="Center"/>
+                                            <TextBlock Text="1M passwords" FontSize="9" Foreground="Gray" TextAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Column="0" Grid.Row="1" HorizontalAlignment="Stretch" Padding="0,6"
+                                            Click="OnDownloadCommon"
+                                            ToolTipService.ToolTip="Common passwords for Wi-Fi routers">
+                                        <StackPanel Spacing="2">
+                                            <FontIcon Glyph="&#xE896;" FontSize="11" Foreground="#107C10"/>
+                                            <TextBlock Text="common-wifi.txt" FontSize="10" TextAlignment="Center"/>
+                                            <TextBlock Text="Router defaults" FontSize="9" Foreground="Gray" TextAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Column="1" Grid.Row="1" HorizontalAlignment="Stretch" Padding="0,6"
+                                            Click="OnOpenWordlistFolder"
+                                            ToolTipService.ToolTip="Open wordlists folder">
+                                        <StackPanel Spacing="2">
+                                            <FontIcon Glyph="&#xED43;" FontSize="11" Foreground="#FF8C00"/>
+                                            <TextBlock Text="Open Folder" FontSize="10" TextAlignment="Center"/>
+                                            <TextBlock Text="Browse local" FontSize="9" Foreground="Gray" TextAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <ProgressBar x:Name="WordlistDownloadBar" IsIndeterminate="False" Value="0"
+                                             Height="3" Visibility="Collapsed"/>
+                                <TextBlock x:Name="WordlistDownloadText" FontSize="10" Foreground="Gray"
+                                           Visibility="Collapsed"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ATTACK SETTINGS -->
+                    <Border CornerRadius="10" Padding="14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border CornerRadius="12" Width="24" Height="24"
+                                        Background="#22FF8C00" BorderBrush="#44FF8C00" BorderThickness="1">
+                                    <TextBlock Text="3" FontSize="11" FontWeight="Bold" Foreground="#FF8C00"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Attack Settings" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Hash type -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Hash type (-m)" FontSize="11" Foreground="Gray"/>
+                                <ComboBox x:Name="HashTypeCombo" HorizontalAlignment="Stretch"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Tag="22000"  Content="22000 - WPA/WPA2 (PMKID+EAPOL) - Wi-Fi"/>
+                                    <ComboBoxItem Tag="2500"   Content="2500  - WPA/WPA2 (old .hccapx)"/>
+                                    <ComboBoxItem Tag="22001"  Content="22001 - WPA/WPA2 PMKID only"/>
+                                    <ComboBoxItem Tag="0"      Content="0     - MD5"/>
+                                    <ComboBoxItem Tag="100"    Content="100   - SHA1"/>
+                                    <ComboBoxItem Tag="1400"   Content="1400  - SHA256"/>
+                                    <ComboBoxItem Tag="1800"   Content="1800  - sha512crypt (Linux shadow)"/>
+                                    <ComboBoxItem Tag="3200"   Content="3200  - bcrypt"/>
+                                    <ComboBoxItem Tag="1000"   Content="1000  - NTLM (Windows)"/>
+                                    <ComboBoxItem Tag="5600"   Content="5600  - NetNTLMv2"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Attack mode -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Attack mode (-a)" FontSize="11" Foreground="Gray"/>
+                                <ComboBox x:Name="AttackModeCombo" HorizontalAlignment="Stretch"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Tag="0" Content="0 - Dictionary attack (use wordlist)"/>
+                                    <ComboBoxItem Tag="1" Content="1 - Combinator attack (2 wordlists)"/>
+                                    <ComboBoxItem Tag="3" Content="3 - Brute-force / Mask attack"/>
+                                    <ComboBoxItem Tag="6" Content="6 - Hybrid Wordlist + Mask"/>
+                                    <ComboBoxItem Tag="7" Content="7 - Hybrid Mask + Wordlist"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Mask (visible when attack mode = 3) -->
+                            <StackPanel x:Name="MaskPanel" Spacing="4" Visibility="Collapsed">
+                                <TextBlock Text="Mask (brute-force pattern)" FontSize="11" Foreground="Gray"/>
+                                <ComboBox x:Name="MaskPresetCombo" HorizontalAlignment="Stretch"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Tag="?d?d?d?d?d?d?d?d" Content="8 digits (12345678)"/>
+                                    <ComboBoxItem Tag="?l?l?l?l?l?l?l?l" Content="8 lowercase letters"/>
+                                    <ComboBoxItem Tag="?u?l?l?l?l?l?l?d" Content="Upper+lower+digit (8 chars)"/>
+                                    <ComboBoxItem Tag="?a?a?a?a?a?a?a?a" Content="8 any characters"/>
+                                    <ComboBoxItem Tag="custom"            Content="Custom mask..."/>
+                                </ComboBox>
+                                <TextBox x:Name="CustomMaskBox" PlaceholderText="e.g. ?d?d?d?d?d?d?d?d"
+                                         FontFamily="Consolas" FontSize="11" Visibility="Collapsed"/>
+                            </StackPanel>
+
+                            <!-- Rules -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Rules file (optional)" FontSize="11" Foreground="Gray"/>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="RulesBox" PlaceholderText="Optional: path to .rule file"
+                                             FontFamily="Consolas" FontSize="11"/>
+                                    <Button Grid.Column="1" Padding="10,6" Click="OnBrowseRules">
+                                        <FontIcon Glyph="&#xED43;" FontSize="13"/>
+                                    </Button>
+                                </Grid>
+                                <TextBlock FontSize="10" Foreground="Gray">
+                                    <Run Text="Hashcat includes rules in: "/>
+                                    <Run Text="rules\best64.rule" FontFamily="Consolas"/>
+                                </TextBlock>
+                                <TextBlock x:Name="RulesDirHint" FontFamily="Consolas" FontSize="10"
+                                           Foreground="Gray" Visibility="Collapsed"/>
+                            </StackPanel>
+
+                            <!-- Devices -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Compute device" FontSize="11" Foreground="Gray"/>
+                                <ComboBox x:Name="DeviceCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                    <ComboBoxItem Tag=""     Content="Auto (GPU + CPU)"/>
+                                    <ComboBoxItem Tag="-D 1" Content="GPU only (-D 1)"/>
+                                    <ComboBoxItem Tag="-D 2" Content="CPU only (-D 2)"/>
+                                    <ComboBoxItem Tag="-D 1,2" Content="GPU + CPU (-D 1,2)"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Workload -->
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Workload profile (-w)" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="WorkloadRun" Text="2 — Default" FontSize="11" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <Slider x:Name="WorkloadSlider" Minimum="1" Maximum="4" Value="2"
+                                        StepFrequency="1"/>
+                                <TextBlock FontSize="10" Foreground="Gray">
+                                    1=Low (background)  2=Default  3=High  4=Nightmare (may freeze PC)
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- OUTPUT / SESSION -->
+                    <Border CornerRadius="10" Padding="14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Output &amp; Session" FontSize="13" FontWeight="SemiBold"/>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Output file (cracked passwords)" FontSize="11" Foreground="Gray"/>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="OutputFileBox" FontFamily="Consolas" FontSize="11"
+                                             PlaceholderText="cracked.txt (auto-set)"/>
+                                    <Button Grid.Column="1" Padding="10,6" Click="OnBrowseOutput">
+                                        <FontIcon Glyph="&#xED43;" FontSize="13"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Session name" FontSize="11" Foreground="Gray"/>
+                                <TextBox x:Name="SessionBox" Text="hashcat_session" FontFamily="Consolas" FontSize="11"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- START / STOP / RESUME -->
+                    <StackPanel Spacing="6">
+                        <Button x:Name="StartBtn" HorizontalAlignment="Stretch" Padding="0,12"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Click="OnStartCracking">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE768;" FontSize="16"/>
+                                <TextBlock Text="Start Cracking" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        <Grid ColumnSpacing="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" HorizontalAlignment="Stretch" Padding="0,8"
+                                    Click="OnPauseCracking"
+                                    ToolTipService.ToolTip="Pause (send 'p' to hashcat)">
+                                <StackPanel Spacing="2">
+                                    <FontIcon Glyph="&#xE769;" FontSize="13"/>
+                                    <TextBlock Text="Pause" FontSize="10" TextAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" HorizontalAlignment="Stretch" Padding="0,8"
+                                    Click="OnResumeCracking"
+                                    ToolTipService.ToolTip="Resume (send 'r' to hashcat)">
+                                <StackPanel Spacing="2">
+                                    <FontIcon Glyph="&#xE768;" FontSize="13" Foreground="#107C10"/>
+                                    <TextBlock Text="Resume" FontSize="10" TextAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="2" HorizontalAlignment="Stretch" Padding="0,8"
+                                    Click="OnStopCracking"
+                                    ToolTipService.ToolTip="Stop hashcat process">
+                                <StackPanel Spacing="2">
+                                    <FontIcon Glyph="&#xE71A;" FontSize="13" Foreground="#E81123"/>
+                                    <TextBlock Text="Stop" FontSize="10" TextAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ═══ RIGHT PANEL — Output ═══ -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Progress bar row -->
+                <Border Grid.Row="0" Padding="16,10"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <!-- Speed -->
+                                <StackPanel Spacing="1">
+                                    <TextBlock Text="Speed" FontSize="10" Foreground="Gray"/>
+                                    <TextBlock x:Name="SpeedText" Text="—" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                </StackPanel>
+                                <Rectangle Width="1" Height="30" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                                <!-- Progress -->
+                                <StackPanel Spacing="1">
+                                    <TextBlock Text="Progress" FontSize="10" Foreground="Gray"/>
+                                    <TextBlock x:Name="ProgressText" Text="—" FontSize="14" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <Rectangle Width="1" Height="30" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                                <!-- ETA -->
+                                <StackPanel Spacing="1">
+                                    <TextBlock Text="ETA" FontSize="10" Foreground="Gray"/>
+                                    <TextBlock x:Name="EtaText" Text="—" FontSize="14" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <Rectangle Width="1" Height="30" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                                <!-- Time elapsed -->
+                                <StackPanel Spacing="1">
+                                    <TextBlock Text="Elapsed" FontSize="10" Foreground="Gray"/>
+                                    <TextBlock x:Name="ElapsedText" Text="—" FontSize="14" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <ProgressBar x:Name="CrackProgressBar" Value="0" Maximum="100"
+                                         IsIndeterminate="False" Height="5"/>
+                        </StackPanel>
+
+                        <!-- Running badge -->
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                            <Border x:Name="RunningBadge" CornerRadius="6" Padding="10,4"
+                                    Background="#22107C10" BorderBrush="#44107C10" BorderThickness="1"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <Ellipse Width="7" Height="7" Fill="#107C10"/>
+                                    <TextBlock Text="Running" FontSize="11" FontWeight="SemiBold" Foreground="#107C10"/>
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="CrackedBadge" CornerRadius="6" Padding="10,4"
+                                    Background="#22107C10" BorderBrush="#44107C10" BorderThickness="1"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <FontIcon Glyph="&#xE73E;" FontSize="11" Foreground="#107C10"/>
+                                    <TextBlock x:Name="CrackedCountText" Text="0 cracked" FontSize="11" FontWeight="SemiBold" Foreground="#107C10"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Cracked passwords panel (shown when cracks found) -->
+                <Border x:Name="CrackedPanel" Grid.Row="1" Padding="14,10"
+                        Background="#22107C10"
+                        BorderBrush="#44107C10" BorderThickness="0,0,0,1"
+                        Visibility="Collapsed">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE73E;" FontSize="14" Foreground="#107C10"/>
+                            <TextBlock Text="Cracked Passwords" FontSize="13" FontWeight="SemiBold" Foreground="#107C10"/>
+                        </StackPanel>
+                        <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                            <TextBox x:Name="CrackedBox" IsReadOnly="True" AcceptsReturn="True"
+                                     FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                                     Foreground="#107C10" Background="Transparent" BorderThickness="0"
+                                     PlaceholderText="Cracked passwords will appear here…"/>
+                        </ScrollViewer>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Padding="8,4" Click="OnCopyCracked">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE8C8;" FontSize="11"/>
+                                    <TextBlock Text="Copy" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="8,4" Click="OnSaveCracked">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE74E;" FontSize="11"/>
+                                    <TextBlock Text="Save" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Terminal Output -->
+                <Border Grid.Row="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+                    <!-- Header -->
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0" Padding="14,8"
+                                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE756;" FontSize="14"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                    <TextBlock Text="Hashcat Output" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                    <Button Padding="8,5" Click="OnCopyOutput">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="12"/>
+                                            <TextBlock Text="Copy" FontSize="11"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="8,5" Click="OnClearOutput">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="12"/>
+                                            <TextBlock Text="Clear" FontSize="11"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="8,5" Click="OnShowCracked">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon Glyph="&#xE8D4;" FontSize="12" Foreground="#107C10"/>
+                                            <TextBlock Text="Show Cracked" FontSize="11"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer x:Name="OutputScrollViewer" Grid.Row="1"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Auto">
+                            <TextBox x:Name="OutputBox"
+                                     IsReadOnly="True"
+                                     TextWrapping="NoWrap"
+                                     AcceptsReturn="True"
+                                     FontFamily="Consolas"
+                                     FontSize="12"
+                                     Padding="14"
+                                     Background="Transparent"
+                                     BorderThickness="0"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <!-- Command preview bar -->
+                <Border Grid.Row="3" Padding="14,8"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Command preview:" FontSize="10" Foreground="Gray"/>
+                        <TextBlock x:Name="CommandPreviewBox" FontFamily="Consolas" FontSize="11"
+                                   TextWrapping="Wrap" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                   Text="hashcat -m 22000 -a 0 &lt;hash&gt; &lt;wordlist&gt; -w 2 -o cracked.txt"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

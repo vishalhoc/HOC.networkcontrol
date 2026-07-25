@@ -42,21 +42,10 @@ public static class FirewallService
 
     public static void UnblockApp(string appName)
     {
-        string ruleIn = $"WinNetControl_Block_{appName}_In";
+        string ruleIn  = $"WinNetControl_Block_{appName}_In";
         string ruleOut = $"WinNetControl_Block_{appName}_Out";
-
-        var psiIn = new System.Diagnostics.ProcessStartInfo("netsh", $"advfirewall firewall delete rule name=\"{ruleIn}\"");
-        psiIn.CreateNoWindow = true;
-        psiIn.UseShellExecute = true;
-        psiIn.Verb = "runas";
-        System.Diagnostics.Process.Start(psiIn)?.WaitForExit();
-
-        var psiOut = new System.Diagnostics.ProcessStartInfo("netsh", $"advfirewall firewall delete rule name=\"{ruleOut}\"");
-        psiOut.CreateNoWindow = true;
-        psiOut.UseShellExecute = true;
-        psiOut.Verb = "runas";
-        System.Diagnostics.Process.Start(psiOut)?.WaitForExit();
-
+        ElevatedRunner.RunNetsh($"advfirewall firewall delete rule name=\"{ruleIn}\"");
+        ElevatedRunner.RunNetsh($"advfirewall firewall delete rule name=\"{ruleOut}\"");
         HistoryLogService.AddLog("Firewall Rule Removed", appName, "Removed both Inbound and Outbound block rules");
     }
 
@@ -65,13 +54,10 @@ public static class FirewallService
         if (string.IsNullOrWhiteSpace(appPath)) return;
         string rule = InboundRuleName(appName);
         DeleteRule(rule);
-        var psi = new System.Diagnostics.ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{rule}\" dir=in action=block program=\"{appPath}\" enable=yes");
-        psi.CreateNoWindow = true;
-        psi.UseShellExecute = true;
-        psi.Verb = "runas";
-        System.Diagnostics.Process.Start(psi)?.WaitForExit();
+        ElevatedRunner.RunNetsh($"advfirewall firewall add rule name=\"{rule}\" dir=in action=block program=\"{appPath}\" enable=yes");
         HistoryLogService.AddLog("Firewall Rule Added", appName, $"Direction: Inbound, Path: {appPath}");
     }
+
 
     public static void BlockAppOutbound(string appName, string appPath)
     {

@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using WinNetControl.Core;
 using WinNetControl.ViewModels;
 using System;
 using System.Collections.ObjectModel;
@@ -319,15 +320,10 @@ public sealed partial class NetworkInterfacesPage : Page
     {
         return Task.Run(() =>
         {
-            var psi = new System.Diagnostics.ProcessStartInfo(exe, args)
-            {
-                Verb              = "runas",
-                UseShellExecute   = true,
-                CreateNoWindow    = true,
-                WindowStyle       = System.Diagnostics.ProcessWindowStyle.Hidden
-            };
-            var proc = System.Diagnostics.Process.Start(psi)!;
-            proc.WaitForExit();
+            if (exe.Equals("netsh", StringComparison.OrdinalIgnoreCase))
+                ElevatedRunner.RunNetsh(args);
+            else
+                ElevatedRunner.RunPowerShell(args);
         });
     }
 }

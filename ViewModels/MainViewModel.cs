@@ -14,7 +14,7 @@ public partial class MainViewModel : ObservableObject
     private readonly NetworkSpeedMonitorService _speedMonitor;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
-    public AppConfig CurrentConfig { get; private set; }
+    public AppConfig CurrentConfig { get; internal set; }
     public HttpProxyService ProxyService { get; }
     public WinNetControl.Core.AppIconCache IconCache { get; } = new();
 

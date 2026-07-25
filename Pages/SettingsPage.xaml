@@ -18,34 +18,46 @@
         <Border Grid.Row="0" Padding="20,14"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
-                    <FontIcon Glyph="&#xE713;" FontSize="22" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                </Border>
-                <StackPanel VerticalAlignment="Center" Spacing="2">
-                    <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Text="Appearance · Behavior · Startup · Data · About" FontSize="12" Foreground="Gray"/>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <FontIcon Glyph="&#xE713;" FontSize="22" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="Appearance · Widget · Behavior · Notifications · Dependencies · Data · About" FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
+                <Button Grid.Column="1" Padding="14,8" Click="OnSave"
+                        Style="{ThemeResource AccentButtonStyle}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE74E;" FontSize="13"/>
+                        <TextBlock Text="Save Settings" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
         </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="14" Padding="16,14,16,28" MaxWidth="700" HorizontalAlignment="Left">
+            <StackPanel Spacing="14" Padding="16,14,16,28" MaxWidth="760" HorizontalAlignment="Left">
 
                 <!-- ── Appearance ── -->
-                <Border CornerRadius="12" Padding="16"
+                <Border CornerRadius="12" Padding="18"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
-                    <StackPanel Spacing="12">
+                    <StackPanel Spacing="14">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE790;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                             <TextBlock Text="Appearance" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <Grid ColumnSpacing="16">
+                        <Grid ColumnSpacing="16" RowSpacing="12">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Theme" FontSize="12"/>
+                                <TextBlock Text="App theme" FontSize="12" Foreground="Gray"/>
                                 <ComboBox x:Name="ThemeCombo" HorizontalAlignment="Stretch"
                                           SelectionChanged="OnThemeChanged">
                                     <ComboBoxItem Content="System Default" Tag="default"/>
@@ -53,8 +65,9 @@
                                     <ComboBoxItem Content="Light" Tag="light"/>
                                 </ComboBox>
                             </StackPanel>
+
                             <StackPanel Grid.Column="1" Spacing="6">
-                                <TextBlock Text="Navigation pane" FontSize="12"/>
+                                <TextBlock Text="Navigation pane" FontSize="12" Foreground="Gray"/>
                                 <ComboBox x:Name="NavPaneCombo" HorizontalAlignment="Stretch"
                                           SelectionChanged="OnNavPaneChanged">
                                     <ComboBoxItem Content="Left (expanded)" Tag="left"/>
@@ -62,17 +75,103 @@
                                     <ComboBoxItem Content="Top" Tag="top"/>
                                 </ComboBox>
                             </StackPanel>
-                        </Grid>
 
-                        <ToggleSwitch x:Name="AcrylicSwitch" Header="Acrylic / Mica background"
-                                      Toggled="OnAcrylicToggled"/>
-                        <ToggleSwitch x:Name="AnimationsSwitch" Header="Smooth animations"
-                                      IsOn="True"/>
+                            <ToggleSwitch Grid.Row="1" x:Name="AcrylicSwitch" Header="Acrylic / Mica background"
+                                          Toggled="OnAcrylicToggled"/>
+                            <ToggleSwitch Grid.Row="1" Grid.Column="1" x:Name="AnimationsSwitch"
+                                          Header="Smooth animations" IsOn="True"
+                                          Toggled="OnAnimationsToggled"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Widget Customization ── -->
+                <Border CornerRadius="12" Padding="18"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="14">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xECAA;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Widget Customization" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="Controls the floating overlay widget (if enabled). Changes take effect when the widget next refreshes."
+                                   FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+
+                        <Grid ColumnSpacing="16" RowSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Opacity -->
+                            <StackPanel Spacing="6">
+                                <TextBlock FontSize="12" Foreground="Gray">
+                                    <Run Text="Opacity: "/><Run x:Name="OpacityValueRun" Text="85%"/>
+                                </TextBlock>
+                                <Slider x:Name="OpacitySlider" Minimum="20" Maximum="100" StepFrequency="5"
+                                        ValueChanged="OnOpacityChanged"/>
+                            </StackPanel>
+
+                            <!-- Font size -->
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock FontSize="12" Foreground="Gray">
+                                    <Run Text="Font size: "/><Run x:Name="FontSizeValueRun" Text="14 pt"/>
+                                </TextBlock>
+                                <Slider x:Name="FontSizeSlider" Minimum="10" Maximum="22" StepFrequency="1"
+                                        ValueChanged="OnFontSizeChanged"/>
+                            </StackPanel>
+
+                            <!-- Width -->
+                            <StackPanel Grid.Row="1" Spacing="6">
+                                <TextBlock Text="Widget width (px)" FontSize="12" Foreground="Gray"/>
+                                <NumberBox x:Name="WidgetWidthBox" Minimum="180" Maximum="600" Value="280"
+                                           SpinButtonPlacementMode="Inline"
+                                           ValueChanged="OnWidgetSizeChanged"/>
+                            </StackPanel>
+
+                            <!-- Height -->
+                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
+                                <TextBlock Text="Widget height (px)" FontSize="12" Foreground="Gray"/>
+                                <NumberBox x:Name="WidgetHeightBox" Minimum="60" Maximum="400" Value="120"
+                                           SpinButtonPlacementMode="Inline"
+                                           ValueChanged="OnWidgetSizeChanged"/>
+                            </StackPanel>
+
+                            <!-- Layout -->
+                            <StackPanel Grid.Row="2" Spacing="6">
+                                <TextBlock Text="Widget layout" FontSize="12" Foreground="Gray"/>
+                                <ComboBox x:Name="WidgetLayoutCombo" HorizontalAlignment="Stretch"
+                                          SelectionChanged="OnWidgetLayoutChanged">
+                                    <ComboBoxItem Content="Vertical (stacked)" Tag="Vertical"/>
+                                    <ComboBoxItem Content="Horizontal (side-by-side)" Tag="Horizontal"/>
+                                    <ComboBoxItem Content="Compact (icon only)" Tag="Compact"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Refresh rate -->
+                            <StackPanel Grid.Row="2" Grid.Column="1" Spacing="6">
+                                <TextBlock Text="Refresh interval" FontSize="12" Foreground="Gray"/>
+                                <ComboBox x:Name="RefreshCombo" HorizontalAlignment="Stretch"
+                                          SelectionChanged="OnRefreshIntervalChanged">
+                                    <ComboBoxItem Content="500 ms (fast)" Tag="500"/>
+                                    <ComboBoxItem Content="1 second" Tag="1000"/>
+                                    <ComboBoxItem Content="2 seconds" Tag="2000"/>
+                                    <ComboBoxItem Content="5 seconds (low CPU)" Tag="5000"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Transparency off -->
+                            <ToggleSwitch Grid.Row="3" x:Name="DisableTransparencySwitch"
+                                          Header="Disable widget transparency"
+                                          OffContent="Off — widget is translucent"
+                                          OnContent="On — solid background (better readability)"
+                                          Toggled="OnDisableTransparencyToggled"/>
+                        </Grid>
                     </StackPanel>
                 </Border>
 
                 <!-- ── Behavior ── -->
-                <Border CornerRadius="12" Padding="16"
+                <Border CornerRadius="12" Padding="18"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="12">
@@ -81,30 +180,29 @@
                             <TextBlock Text="Behavior" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <ToggleSwitch x:Name="StartWithWindowsSwitch" Header="Start with Windows"
-                                      Toggled="OnStartWithWindowsToggled"/>
-                        <ToggleSwitch x:Name="StartMinimizedSwitch" Header="Start minimized to system tray"
-                                      Toggled="OnStartMinimizedToggled"/>
-                        <ToggleSwitch x:Name="BlockNewAppsSwitch" Header="Block new apps by default"
-                                      Toggled="OnBlockNewAppsToggled"/>
-                        <ToggleSwitch x:Name="ShowOfflineSwitch" Header="Show offline/blocked apps"
-                                      Toggled="OnShowOfflineToggled"/>
+                        <Grid ColumnSpacing="16" RowSpacing="10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Refresh interval" FontSize="12"/>
-                            <ComboBox x:Name="RefreshCombo" HorizontalAlignment="Left" Width="220"
-                                      SelectionChanged="OnRefreshIntervalChanged">
-                                <ComboBoxItem Content="500 ms (fast)" Tag="500"/>
-                                <ComboBoxItem Content="1 second" Tag="1000"/>
-                                <ComboBoxItem Content="2 seconds" Tag="2000"/>
-                                <ComboBoxItem Content="5 seconds (low CPU)" Tag="5000"/>
-                            </ComboBox>
-                        </StackPanel>
+                            <ToggleSwitch x:Name="StartWithWindowsSwitch" Header="Start with Windows"
+                                          Toggled="OnStartWithWindowsToggled"/>
+                            <ToggleSwitch Grid.Column="1" x:Name="StartMinimizedSwitch"
+                                          Header="Start minimized to system tray"
+                                          Toggled="OnStartMinimizedToggled"/>
+                            <ToggleSwitch Grid.Row="1" x:Name="BlockNewAppsSwitch"
+                                          Header="Block new apps by default"
+                                          OffContent="Off — allow new processes"
+                                          OnContent="On — auto-block any newly detected process"
+                                          Toggled="OnBlockNewAppsToggled"/>
+                            <ToggleSwitch Grid.Row="1" Grid.Column="1" x:Name="ShowOfflineSwitch"
+                                          Header="Show offline / blocked apps"
+                                          Toggled="OnShowOfflineToggled"/>
+                        </Grid>
                     </StackPanel>
                 </Border>
 
                 <!-- ── Notifications ── -->
-                <Border CornerRadius="12" Padding="16"
+                <Border CornerRadius="12" Padding="18"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="12">
@@ -112,21 +210,116 @@
                             <FontIcon Glyph="&#xE7E7;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                             <TextBlock Text="Notifications" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <ToggleSwitch x:Name="NotifyBlockSwitch" Header="Notify when app is blocked"/>
-                        <ToggleSwitch x:Name="NotifyHighUsageSwitch" Header="Notify on high bandwidth usage"/>
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="High bandwidth threshold" FontSize="12"/>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <NumberBox x:Name="ThresholdBox" Value="10" Minimum="1" Maximum="1000"
-                                           SpinButtonPlacementMode="Inline" Width="160"/>
-                                <TextBlock Text="MB/s" VerticalAlignment="Center" Foreground="Gray"/>
+
+                        <Grid ColumnSpacing="16" RowSpacing="10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+
+                            <ToggleSwitch x:Name="NotifyBlockSwitch" Header="Notify when app is blocked"
+                                          Toggled="OnNotifyBlockToggled"/>
+                            <ToggleSwitch Grid.Column="1" x:Name="NotifyHighUsageSwitch"
+                                          Header="Notify on high bandwidth usage"
+                                          Toggled="OnNotifyHighUsageToggled"/>
+
+                            <StackPanel Grid.Row="1" Spacing="6">
+                                <TextBlock Text="High bandwidth threshold" FontSize="12" Foreground="Gray"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <NumberBox x:Name="ThresholdBox" Value="10" Minimum="1" Maximum="10000"
+                                               SpinButtonPlacementMode="Inline" Width="160"
+                                               ValueChanged="OnThresholdChanged"/>
+                                    <TextBlock Text="MB/s" VerticalAlignment="Center" Foreground="Gray"/>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
+
+                            <ToggleSwitch Grid.Row="1" Grid.Column="1" x:Name="NotifyQosSwitch"
+                                          Header="Notify on QoS policy changes"
+                                          Toggled="OnNotifyQosToggled"/>
+                        </Grid>
                     </StackPanel>
                 </Border>
 
-                <!-- ── Data & Privacy ── -->
-                <Border CornerRadius="12" Padding="16"
+                <!-- ── Dependencies ── -->
+                <Border CornerRadius="12" Padding="18"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="14">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE8F1;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Dependencies" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="Some features require external drivers. Install them here with one click."
+                                   FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+
+                        <!-- Npcap row -->
+                        <Border CornerRadius="8" Padding="12,10"
+                                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xEBC4;" FontSize="14"
+                                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                        <TextBlock Text="Npcap" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <Border x:Name="NpcapStatusBadge" CornerRadius="4" Padding="7,2"
+                                                Background="#22808080" BorderBrush="#44808080" BorderThickness="1">
+                                            <TextBlock x:Name="NpcapStatusText" Text="Checking…"
+                                                       FontSize="10" Foreground="Gray"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="Required for: ARP spoofing (internet cut-off), packet capture, raw socket operations."
+                                               FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="NpcapVersionText" Text="" FontSize="11" Foreground="Gray"/>
+                                    <!-- Download progress -->
+                                    <ProgressBar x:Name="NpcapDownloadProgress" Height="4" CornerRadius="2"
+                                                 Minimum="0" Maximum="100" Value="0"
+                                                 Visibility="Collapsed" Margin="0,4,0,0"/>
+                                    <TextBlock x:Name="NpcapDownloadStatus" Text="" FontSize="11"
+                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                               Visibility="Collapsed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <Button x:Name="NpcapInstallBtn" Padding="12,6" Click="OnInstallNpcap"
+                                            Style="{ThemeResource AccentButtonStyle}" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon x:Name="NpcapInstallIcon" Glyph="&#xE896;" FontSize="13"/>
+                                            <TextBlock x:Name="NpcapInstallText" Text="Download &amp; Install" FontSize="12"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="10,6" Click="OnRefreshDependencies"
+                                            ToolTipService.ToolTip="Re-check installed drivers">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- WinDivert row -->
+                        <Border CornerRadius="8" Padding="12,10"
+                                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xEBC4;" FontSize="14"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                    <TextBlock Text="WinDivert" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <Border CornerRadius="4" Padding="7,2"
+                                            Background="#22107C10" BorderBrush="#44107C10" BorderThickness="1">
+                                        <TextBlock Text="✓ Bundled" FontSize="10" Foreground="#107C10"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Required for: packet interception, traffic shaping, HTTP inspector."
+                                           FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Data & Storage ── -->
+                <Border CornerRadius="12" Padding="18"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="12">
@@ -134,7 +327,14 @@
                             <FontIcon Glyph="&#xE8D7;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                             <TextBlock Text="Data &amp; Storage" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Config file location" FontSize="12" Foreground="Gray"/>
+                            <TextBlock x:Name="ConfigPathText" FontSize="11" IsTextSelectionEnabled="True"
+                                       TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                             <Button Padding="12,6" Click="OnOpenConfigFolder">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE8B7;" FontSize="13"/>
@@ -147,10 +347,22 @@
                                     <TextBlock Text="Export Config" FontSize="12"/>
                                 </StackPanel>
                             </Button>
+                            <Button Padding="12,6" Click="OnImportConfig">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8E5;" FontSize="13"/>
+                                    <TextBlock Text="Import Config" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
                             <Button Padding="12,6" Click="OnClearHistory">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="#E02020"/>
                                     <TextBlock Text="Clear History Log" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="12,6" Click="OnResetToDefaults">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72C;" FontSize="13" Foreground="#E02020"/>
+                                    <TextBlock Text="Reset to Defaults" FontSize="12"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
@@ -158,35 +370,78 @@
                     </StackPanel>
                 </Border>
 
-                <!-- ── About ── -->
-                <Border CornerRadius="12" Padding="16"
+                <!-- ── About & Updates ── -->
+                <Border CornerRadius="12" Padding="18"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE946;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                             <TextBlock Text="About" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <Grid ColumnSpacing="24" RowSpacing="6">
+
+                        <Grid ColumnSpacing="24" RowSpacing="7">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                             </Grid.RowDefinitions>
-                            <TextBlock Text="Application" Foreground="Gray" FontSize="11"/>
-                            <TextBlock Grid.Column="1" Text="HOC Network Control" FontSize="11" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Row="1" Text="Version" Foreground="Gray" FontSize="11"/>
-                            <TextBlock x:Name="VersionText" Grid.Row="1" Grid.Column="1" FontSize="11"/>
-                            <TextBlock Grid.Row="2" Text="Platform" Foreground="Gray" FontSize="11"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" FontSize="11" Text="Windows 11 · WinUI 3 · .NET 8"/>
-                            <TextBlock Grid.Row="3" Text="Config path" Foreground="Gray" FontSize="11"/>
-                            <TextBlock x:Name="ConfigPathText" Grid.Row="3" Grid.Column="1" FontSize="11"
-                                       IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
+
+                            <TextBlock Text="Application"  Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="HOC Network Control" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Row="1" Text="Version" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <TextBlock x:Name="VersionText" FontSize="11"/>
+                                <Border x:Name="UpdateBadge" CornerRadius="6" Padding="8,3"
+                                        Background="#1A107C10" BorderBrush="#40107C10" BorderThickness="1"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="UpdateBadgeText" FontSize="10" Foreground="#107C10"/>
+                                </Border>
+                                <Border x:Name="UpdateAvailBadge" CornerRadius="6" Padding="8,3"
+                                        Background="#1AE02020" BorderBrush="#40E02020" BorderThickness="1"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="UpdateAvailText" FontSize="10" Foreground="#E02020"/>
+                                </Border>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="2" Text="Platform" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" FontSize="11"
+                                       Text="Windows 11 · WinUI 3 · .NET 10" VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Row="3" Text="GitHub" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                            <HyperlinkButton Grid.Row="3" Grid.Column="1"
+                                             NavigateUri="https://github.com/vishalhoc/HOC.networkcontrol"
+                                             Padding="0" FontSize="11">
+                                github.com/vishalhoc/HOC.networkcontrol
+                            </HyperlinkButton>
+
+                            <TextBlock Grid.Row="4" Text="Config path" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="ConfigPathAbout" Grid.Row="4" Grid.Column="1" FontSize="11"
+                                       IsTextSelectionEnabled="True" TextWrapping="Wrap" Foreground="Gray"/>
                         </Grid>
 
+                        <!-- Update status -->
+                        <Border x:Name="UpdateBanner" CornerRadius="8" Padding="12"
+                                Background="#1A0078D4" BorderBrush="#400078D4" BorderThickness="1"
+                                Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="3">
+                                    <TextBlock x:Name="UpdateBannerTitle" FontSize="12" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="UpdateBannerBody" FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <HyperlinkButton x:Name="UpdateDownloadBtn" Grid.Column="1"
+                                                 FontSize="11" VerticalAlignment="Center"
+                                                 Visibility="Collapsed">
+                                    Download →
+                                </HyperlinkButton>
+                            </Grid>
+                        </Border>
+
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                            <Button Padding="10,6" Click="OnCheckForUpdates">
+                            <Button x:Name="CheckUpdatesBtn" Padding="12,6" Click="OnCheckForUpdates">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+                                    <FontIcon x:Name="CheckUpdatesIcon" Glyph="&#xE72C;" FontSize="13"/>
                                     <TextBlock Text="Check for Updates" FontSize="12"/>
                                 </StackPanel>
                             </Button>
@@ -202,18 +457,18 @@
                                     <TextBlock Text="Windows Settings" FontSize="12"/>
                                 </StackPanel>
                             </Button>
+                            <HyperlinkButton Padding="10,6"
+                                             NavigateUri="https://github.com/vishalhoc/HOC.networkcontrol/releases">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8A7;" FontSize="13"/>
+                                    <TextBlock Text="All Releases" FontSize="12"/>
+                                </StackPanel>
+                            </HyperlinkButton>
                         </StackPanel>
+                        <TextBlock x:Name="UpdateStatus" Text="" FontSize="11" Foreground="Gray"/>
                     </StackPanel>
                 </Border>
 
-                <!-- Save button -->
-                <Button HorizontalAlignment="Left" Padding="18,10" Click="OnSave"
-                        Style="{ThemeResource AccentButtonStyle}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE74E;" FontSize="14"/>
-                        <TextBlock Text="Save Settings" FontSize="13"/>
-                    </StackPanel>
-                </Button>
                 <TextBlock x:Name="SaveStatus" Text="" FontSize="11" Foreground="#107C10"/>
 
             </StackPanel>

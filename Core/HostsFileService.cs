@@ -281,13 +281,16 @@ public static class HostsFileService
     {
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName  = "notepad.exe",
-                Arguments = $"\"{HostsPath}\"",
-                UseShellExecute = true,
-                Verb = "runas"   // request elevation
-            });
+                FileName        = "notepad.exe",
+                Arguments       = $"\"{HostsPath}\"",
+                UseShellExecute = true
+            };
+            // Only add runas if not already elevated — avoids a second UAC prompt
+            if (!ElevatedRunner.IsAdmin)
+                psi.Verb = "runas";
+            System.Diagnostics.Process.Start(psi);
         }
         catch { }
     }

@@ -10,43 +10,49 @@ namespace WinNetControl.Core;
 
 public class AppIconCache
 {
-    private readonly ConcurrentDictionary<string, ImageSource> _cache = new(StringComparer.OrdinalIgnoreCase);
+    // Store the in-flight task too: one busy browser can own hundreds of sockets,
+    // but its executable icon should be extracted only once.
+    private readonly ConcurrentDictionary<string, Task<ImageSource?>> _cache = new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task<ImageSource?> GetIconAsync(string filePath)
+    public Task<ImageSource?> GetIconAsync(string filePath)
     {
-        if (string.IsNullOrWhiteSpace(filePath)) return null;
-        if (_cache.TryGetValue(filePath, out var cachedImg)) return cachedImg;
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            return Task.FromResult<ImageSource?>(null);
 
+        return _cache.GetOrAdd(filePath, LoadIconAsync);
+    }
+
+    private static async Task<ImageSource?> LoadIconAsync(string filePath)
+    {
         try
         {
-            return await Task.Run(async () =>
+            byte[]? pngBytes = await Task.Run(() =>
             {
                 using Icon? icon = Icon.ExtractAssociatedIcon(filePath);
-                if (icon != null)
-                {
-                    using Bitmap bitmap = icon.ToBitmap();
-                    using MemoryStream ms = new MemoryStream();
-                    bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                    ms.Position = 0;
-
-                    var bitmapImage = new BitmapImage();
-                    // Needs to be executed on the UI thread, so we defer the SetSourceAsync
-                    var tcs = new TaskCompletionSource<ImageSource>();
-                    App.DispatcherQueue.TryEnqueue(async () =>
-                    {
-                        try
-                        {
-                            var clonedStream = new MemoryStream(ms.ToArray());
-                            await bitmapImage.SetSourceAsync(clonedStream.AsRandomAccessStream());
-                            _cache[filePath] = bitmapImage;
-                            tcs.SetResult(bitmapImage);
-                        }
-                        catch { tcs.SetResult(null!); }
-                    });
-                    return await tcs.Task;
-                }
-                return null;
+                if (icon == null) return null;
+                using Bitmap bitmap = icon.ToBitmap();
+                using MemoryStream stream = new();
+                bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                return stream.ToArray();
             });
+
+            if (pngBytes == null) return null;
+
+            var tcs = new TaskCompletionSource<ImageSource?>();
+            if (!App.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    var bitmapImage = new BitmapImage();
+                    using var stream = new MemoryStream(pngBytes);
+                    await bitmapImage.SetSourceAsync(stream.AsRandomAccessStream());
+                    tcs.TrySetResult(bitmapImage);
+                }
+                catch { tcs.TrySetResult(null); }
+            }))
+                return null;
+
+            return await tcs.Task;
         }
         catch { /* Fallback for protected files or missing files */ }
         return null;

@@ -441,7 +441,11 @@
 
                                     <!-- App name + badges -->
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                        <Image Source="{Binding AppIcon}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
+                                        <Grid Width="20" Height="20" VerticalAlignment="Center"
+                                              ToolTipService.ToolTip="{Binding ProcessPath}">
+                                            <FontIcon Glyph="{Binding AppIconGlyph}" FontSize="16" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Image Source="{Binding AppIcon}" Width="20" Height="20" Stretch="Uniform" VerticalAlignment="Center"/>
+                                        </Grid>
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding ProcessName}" FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" MaxWidth="110"/>
@@ -555,6 +559,15 @@
                                 <MenuFlyout Opening="OnProcessContextMenuOpening">
                                     <MenuFlyoutItem Text="Details…" Click="OnCtxDetails">
                                         <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;"/></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutSubItem Text="Set QoS Priority">
+                                        <MenuFlyoutSubItem.Icon><FontIcon Glyph="&#xE9F3;"/></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem Text="High — calls, games, interactive" Click="OnCtxQosHigh"/>
+                                        <MenuFlyoutItem Text="Standard — balanced" Click="OnCtxQosStandard"/>
+                                        <MenuFlyoutItem Text="Lowest — background work" Click="OnCtxQosLow"/>
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem Text="Open Advanced QoS Manager" Click="OnCtxOpenQosManager">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE713;"/></MenuFlyoutItem.Icon>
                                     </MenuFlyoutItem>
                                     <MenuFlyoutSeparator/>
                                     <MenuFlyoutItem Text="Copy Name" Click="OnCtxCopyName">

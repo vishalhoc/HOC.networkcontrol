@@ -22,7 +22,7 @@
                 </Border>
                 <StackPanel VerticalAlignment="Center" Spacing="2">
                     <TextBlock Text="QoS Manager" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Text="Quality of Service · Traffic shaping · Policy-based QoS (user-space)" FontSize="12" Foreground="Gray"/>
+                    <TextBlock Text="Give important apps priority, or create advanced traffic rules" FontSize="12" Foreground="Gray"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -37,9 +37,9 @@
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <FontIcon Glyph="&#xE946;" FontSize="22" Foreground="#0078D4" VerticalAlignment="Top"/>
                         <StackPanel Spacing="4">
-                            <TextBlock Text="Policy-based QoS (User-space)" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="What priority does" FontSize="13" FontWeight="SemiBold"/>
                             <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray"
-                                Text="Windows QoS policies are managed via Group Policy / netsh. This page lets you create, list and remove QoS policies using the built-in Windows QoS subsystem. Policies take effect immediately for matching applications or DSCP-tagged traffic."/>
+                                Text="Priority asks Windows to tag matching traffic so your router can prefer it when the network is busy. It does not create more bandwidth, and support depends on your network equipment. Choose an app policy, or an advanced destination-and-port policy; Windows cannot combine both in one rule."/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -52,6 +52,7 @@
                         <Grid>
                             <TextBlock Text="Active QoS Policies" FontSize="13" FontWeight="SemiBold"/>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <TextBlock x:Name="PolicyListStatus" FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
                                 <Button Padding="8,5" Click="OnRefreshPolicies">
                                     <StackPanel Orientation="Horizontal" Spacing="5">
                                         <FontIcon Glyph="&#xE72C;" FontSize="12"/>
@@ -60,12 +61,63 @@
                                 </Button>
                             </StackPanel>
                         </Grid>
-                        <ScrollViewer Height="180" VerticalScrollBarVisibility="Auto">
-                            <TextBlock x:Name="PolicyOutput"
-                                       FontFamily="Cascadia Code, Consolas" FontSize="12"
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="190"/><ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="60"/><ColumnDefinition Width="75"/>
+                                <ColumnDefinition Width="90"/><ColumnDefinition Width="80"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Policy" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                            <TextBlock Grid.Column="1" Text="Lifetime" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                            <TextBlock Grid.Column="2" Text="Application" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                            <TextBlock Grid.Column="3" Text="Destination" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                            <TextBlock Grid.Column="4" Text="DSCP" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                            <TextBlock Grid.Column="5" Text="Limit" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                            <TextBlock Grid.Column="6" Text="Expires" FontSize="10" FontWeight="SemiBold" Foreground="Gray"/>
+                        </Grid>
+                        <ListView x:Name="PolicyList" Height="200" SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="0,5"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="190"/><ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="*"/><ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="60"/><ColumnDefinition Width="75"/>
+                                            <ColumnDefinition Width="90"/><ColumnDefinition Width="80"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Lifetime}" FontSize="11" Foreground="{Binding LifetimeBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Application}" FontSize="11" Foreground="Gray" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Destination}" FontSize="11" Foreground="Gray" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding Dscp}" FontSize="11" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="5" Text="{Binding Limit}" FontSize="11" Foreground="Gray" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="6" Text="{Binding ExpiresText}" FontSize="10" Foreground="{Binding ExiresBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                            <Button Padding="5,2" Click="OnEditPolicyRow" Tag="{Binding}" ToolTipService.ToolTip="Edit DSCP value">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="11" Foreground="#0078D4"/>
+                                            </Button>
+                                            <Button Padding="5,2" Click="OnRemovePolicyRow" Tag="{Binding}" ToolTipService.ToolTip="Remove this QoS policy">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="11" Foreground="#E02020"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <TextBlock x:Name="NoPoliciesText" Text="No effective QoS policies found." FontSize="11" Foreground="Gray"/>
+                        <Expander Header="Technical policy details" IsExpanded="False">
+                            <TextBlock x:Name="PolicyOutput" Margin="0,8,0,0"
+                                       FontFamily="Cascadia Code, Consolas" FontSize="11"
                                        IsTextSelectionEnabled="True" TextWrapping="Wrap"
-                                       Text="Click Refresh to load current QoS policies…"/>
-                        </ScrollViewer>
+                                       Text="Refresh to inspect raw Windows policy data."/>
+                        </Expander>
                     </StackPanel>
                 </Border>
 
@@ -74,7 +126,9 @@
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="Create QoS Policy" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Text="Quick app priority" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Text="1. Choose an application.  2. Pick how important its traffic is.  3. Apply."
+                                   FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
                         <Grid ColumnSpacing="12" RowSpacing="10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
@@ -83,40 +137,60 @@
                                 <RowDefinition/><RowDefinition/><RowDefinition/>
                             </Grid.RowDefinitions>
 
-                            <TextBox x:Name="PolicyName" Header="Policy Name"
-                                     PlaceholderText="e.g. GamePriority"/>
-                            <TextBox x:Name="PolicyApp" Grid.Column="1" Header="Application (optional)"
-                                     PlaceholderText="e.g. game.exe"/>
+                            <TextBox x:Name="PolicyName" Header="Policy name (optional)"
+                                     PlaceholderText="Created automatically when blank"/>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBox x:Name="PolicyApp" Header="Application executable path"
+                                         PlaceholderText="Choose an .exe, or paste its path"/>
+                                <Button Padding="8,4" HorizontalAlignment="Left" Click="OnChooseApplication">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="12"/>
+                                        <TextBlock Text="Choose application…" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
 
-                            <ComboBox x:Name="PriorityCombo" Grid.Row="1" Header="DSCP Priority"
+                            <ComboBox x:Name="PriorityCombo" Grid.Row="1" Header="Priority level"
                                       HorizontalAlignment="Stretch" SelectedIndex="2">
-                                <ComboBoxItem Content="0 — Best Effort (default)" Tag="0"/>
-                                <ComboBoxItem Content="8 — Background" Tag="8"/>
-                                <ComboBoxItem Content="16 — Standard" Tag="16"/>
-                                <ComboBoxItem Content="24 — Video" Tag="24"/>
-                                <ComboBoxItem Content="32 — Interactive" Tag="32"/>
-                                <ComboBoxItem Content="40 — Streaming" Tag="40"/>
-                                <ComboBoxItem Content="46 — Expedited (VoIP/Gaming)" Tag="46"/>
-                                <ComboBoxItem Content="48 — Network Control" Tag="48"/>
+                                <ComboBoxItem Content="Best effort — default traffic" Tag="0"/>
+                                <ComboBoxItem Content="Low — background work" Tag="8"/>
+                                <ComboBoxItem Content="Standard — normal use" Tag="16"/>
+                                <ComboBoxItem Content="Video — calls and media" Tag="24"/>
+                                <ComboBoxItem Content="Interactive — responsive apps" Tag="32"/>
+                                <ComboBoxItem Content="Streaming — media delivery" Tag="40"/>
+                                <ComboBoxItem Content="High — calls, games, interactive" Tag="46"/>
+                                <ComboBoxItem Content="Network control — advanced only" Tag="48"/>
                             </ComboBox>
                             <NumberBox x:Name="ThrottleKbps" Grid.Row="1" Grid.Column="1"
-                                       Header="Throttle Rate (Kbps, 0=unlimited)"
+                                       Header="Advanced: maximum rate (Kbps, 0=unlimited)"
                                        Value="0" Minimum="0" Maximum="1000000"
                                        SpinButtonPlacementMode="Inline"/>
 
-                            <TextBox x:Name="PolicyDestIp" Grid.Row="2" Header="Destination IP (optional)"
+                            <TextBox x:Name="PolicyDestIp" Grid.Row="2" Header="Advanced destination IP / network (leave app empty)"
                                      PlaceholderText="e.g. 192.168.1.0/24"/>
                             <NumberBox x:Name="PolicyPort" Grid.Row="2" Grid.Column="1"
-                                       Header="Destination Port (0=any)"
+                                       Header="Advanced destination port (0=any; leave app empty)"
                                        Value="0" Minimum="0" Maximum="65535"
                                        SpinButtonPlacementMode="Inline"/>
                         </Grid>
 
+                        <ToggleSwitch x:Name="ApplyAllTraffic" Header="Apply to all traffic"
+                                      OffContent="Off — only the selected application is matched"
+                                      OnContent="On — network-wide policy (advanced)"
+                                      ToolTipService.ToolTip="Turn this on only when you intentionally want a policy without an application."/>
+                        <ToggleSwitch x:Name="MakePersistent" Header="Make persistent (survives reboots)"
+                                      OffContent="Off — session only, removed on reboot"
+                                      OnContent="On — saved to localhost store, survives reboots"
+                                      ToolTipService.ToolTip="When on, the rule is saved to the localhost policy store and will survive reboots."/>
+                        <NumberBox x:Name="ExpiryMinutes" Header="Auto-expire after (minutes, 0=never)"
+                                   Value="0" Minimum="0" Maximum="10080"
+                                   SpinButtonPlacementMode="Inline"
+                                   ToolTipService.ToolTip="Set a countdown to automatically remove this policy. 0 = keep forever."/>
                         <Button Padding="14,8" Click="OnCreatePolicy"
                                 Style="{ThemeResource AccentButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE710;" FontSize="13"/>
-                                <TextBlock Text="Create Policy"/>
+                                <TextBlock Text="Apply priority"/>
                             </StackPanel>
                         </Button>
                         <TextBlock x:Name="PolicyStatus" Text="" FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
@@ -147,7 +221,9 @@
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="One-Click Presets" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Text="Priority shortcuts" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Text="These fill the Quick app priority form. Choose the application, then click Apply priority."
+                                   FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
                         <StackPanel Orientation="Horizontal" Spacing="8" FlowDirection="LeftToRight">
                             <Button Padding="12,8" Click="OnPreset" Tag="gaming">
                                 <StackPanel Spacing="4" HorizontalAlignment="Center">

@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using WinNetControl.Core;
 using WinNetControl.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -297,12 +298,9 @@ public sealed partial class WirelessPage : Page
 
     private static Task RunElevatedAsync(string exe, string args) => Task.Run(() =>
     {
-        var psi = new System.Diagnostics.ProcessStartInfo(exe, args)
-        {
-            Verb            = "runas",
-            UseShellExecute = true,
-            WindowStyle     = System.Diagnostics.ProcessWindowStyle.Hidden
-        };
-        System.Diagnostics.Process.Start(psi)?.WaitForExit();
+        if (exe.Equals("netsh", StringComparison.OrdinalIgnoreCase))
+            ElevatedRunner.RunNetsh(args);
+        else
+            ElevatedRunner.RunPowerShell(args);
     });
 }

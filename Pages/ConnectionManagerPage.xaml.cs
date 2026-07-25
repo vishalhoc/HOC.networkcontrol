@@ -386,6 +386,32 @@ public sealed partial class ConnectionManagerPage : Page
         }
     }
 
+    private async void OnCtxQosHigh(object sender, RoutedEventArgs e)
+        => await SetProcessQosAsync(QosPolicyService.HighPriorityDscp);
+
+    private async void OnCtxQosStandard(object sender, RoutedEventArgs e)
+        => await SetProcessQosAsync(QosPolicyService.StandardPriorityDscp);
+
+    private async void OnCtxQosLow(object sender, RoutedEventArgs e)
+        => await SetProcessQosAsync(QosPolicyService.LowPriorityDscp);
+
+    private async System.Threading.Tasks.Task SetProcessQosAsync(int dscp)
+    {
+        if (_ctxProcess == null) return;
+        var result = await QosPolicyService.SetPriorityAsync(
+            _ctxProcess.ProcessPath, _ctxProcess.ProcessName, dscp);
+
+        ShowMessage(result.Success ? "QoS Priority Applied" : "QoS Priority Not Applied",
+            result.Success
+                ? result.Message
+                : $"{result.Message}\n\nUse Advanced QoS Manager if you want a network-wide policy or a destination-specific rule.");
+        HistoryLogService.AddLog("Connection Manager", _ctxProcess.ProcessName,
+            result.Success ? $"QoS {QosPolicyService.PriorityLabel(dscp)} applied" : $"QoS failed: {result.Message}");
+    }
+
+    private void OnCtxOpenQosManager(object sender, RoutedEventArgs e)
+        => (App.Window as MainWindow)?.NavigateTo("Qos");
+
     private void OnCtxBlock(object sender, RoutedEventArgs e)
     {
         if (_ctxProcess != null) { _ctxProcess.IsBlocked = true; ViewModel.ToggleBlock(_ctxProcess); }
@@ -594,15 +620,8 @@ public sealed partial class ConnectionManagerPage : Page
                 throw new Exception("Please use valid CIDR notation (e.g. 192.168.1.0/24).");
 
             string ruleName = $"WinNetControl_BlockSubnet_{subnet.Replace("/", "_")}";
-            var psiOut = new System.Diagnostics.ProcessStartInfo("netsh",
-                $"advfirewall firewall add rule name=\"{ruleName}_Out\" dir=out action=block remoteip={subnet}")
-                { CreateNoWindow = true, UseShellExecute = true, Verb = "runas" };
-            System.Diagnostics.Process.Start(psiOut)?.WaitForExit();
-
-            var psiIn = new System.Diagnostics.ProcessStartInfo("netsh",
-                $"advfirewall firewall add rule name=\"{ruleName}_In\" dir=in action=block remoteip={subnet}")
-                { CreateNoWindow = true, UseShellExecute = true, Verb = "runas" };
-            System.Diagnostics.Process.Start(psiIn)?.WaitForExit();
+            ElevatedRunner.RunNetsh($"advfirewall firewall add rule name=\"{ruleName}_Out\" dir=out action=block remoteip={subnet}");
+            ElevatedRunner.RunNetsh($"advfirewall firewall add rule name=\"{ruleName}_In\" dir=in action=block remoteip={subnet}");
 
             await new ContentDialog
             {

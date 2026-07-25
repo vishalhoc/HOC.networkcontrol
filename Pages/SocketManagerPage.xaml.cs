@@ -5,11 +5,13 @@ using Microsoft.UI.Xaml.Navigation;
 using WinNetControl.Core;
 using WinNetControl.ViewModels;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.UI;
 
@@ -30,6 +32,15 @@ public partial class SocketRow : CommunityToolkit.Mvvm.ComponentModel.Observable
 
     [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
     private Microsoft.UI.Xaml.Media.ImageSource? _appIcon;
+
+    public string AppIconGlyph => ProcessName.ToLowerInvariant() switch
+    {
+        var name when name.Contains("chrome") || name.Contains("msedge") || name.Contains("firefox") || name.Contains("opera") => "\uE774",
+        var name when name.Contains("explorer") => "\uE8B7",
+        var name when name.Contains("service") || name.Contains("system") || name.Contains("svchost") => "\uE713",
+        var name when name.Contains("powershell") || name.Contains("cmd") || name.Contains("terminal") => "\uE756",
+        _ => "\uE8A5"
+    };
 
     [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
     [CommunityToolkit.Mvvm.ComponentModel.NotifyPropertyChangedFor(nameof(ActionBrush), nameof(BlockBorderBrush), nameof(BlockIcon), nameof(BlockToolTip))]
@@ -67,6 +78,9 @@ public sealed partial class SocketManagerPage : Page
     private WinNetControl.ViewModels.MainViewModel? _viewModel;
 
     private System.Threading.Timer? _autoTimer;
+
+    // In-memory QoS expiry timers: policyName → CancellationTokenSource
+    private static readonly ConcurrentDictionary<string, CancellationTokenSource> _qosTimers = new();
 
     public SocketManagerPage() { this.InitializeComponent(); SocketList.ItemsSource = _view; }
 
@@ -131,6 +145,149 @@ public sealed partial class SocketManagerPage : Page
             Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
         }
     }
+
+    // ── Whole-app QoS (existing behaviour, app-path policy) ──────────────────
+    private async void OnSetSocketQosHigh(object sender, RoutedEventArgs e)
+        => await SetSocketAppQosAsync(sender, QosPolicyService.HighPriorityDscp);
+
+    private async void OnSetSocketQosStandard(object sender, RoutedEventArgs e)
+        => await SetSocketAppQosAsync(sender, QosPolicyService.StandardPriorityDscp);
+
+    private async void OnSetSocketQosLow(object sender, RoutedEventArgs e)
+        => await SetSocketAppQosAsync(sender, QosPolicyService.LowPriorityDscp);
+
+    private async Task SetSocketAppQosAsync(object sender, int dscp)
+    {
+        if (sender is not MenuFlyoutItem { Tag: SocketRow row }) return;
+        if (string.IsNullOrWhiteSpace(row.ProcessPath))
+        {
+            SocketStatus.Text = "⚠ Windows did not expose this app's executable path. Use 'This socket only' instead.";
+            return;
+        }
+        SocketStatus.Text = $"Applying {QosPolicyService.PriorityLabel(dscp)} to all {row.ProcessName} traffic…";
+        var result = await QosPolicyService.SetPriorityAsync(row.ProcessPath, row.ProcessName, dscp);
+        SocketStatus.Text = result.Success
+            ? $"✓ Whole-app policy applied to {row.ProcessName}. All traffic from this app will be marked {QosPolicyService.PriorityLabel(dscp)}."
+            : $"QoS not applied: {result.Message}";
+        HistoryLogService.AddLog("Socket", row.ProcessName,
+            result.Success ? $"QoS {QosPolicyService.PriorityLabel(dscp)} (whole app)" : $"QoS failed: {result.Message}");
+    }
+
+    // ── Socket-only QoS (destination IP:Port policy) ───────────────────────────
+    private async void OnSetSocketOnlyQosHigh(object sender, RoutedEventArgs e)
+        => await SetSocketOnlyQosAsync(sender, QosPolicyService.HighPriorityDscp);
+
+    private async void OnSetSocketOnlyQosStandard(object sender, RoutedEventArgs e)
+        => await SetSocketOnlyQosAsync(sender, QosPolicyService.StandardPriorityDscp);
+
+    private async void OnSetSocketOnlyQosLow(object sender, RoutedEventArgs e)
+        => await SetSocketOnlyQosAsync(sender, QosPolicyService.LowPriorityDscp);
+
+    private async Task SetSocketOnlyQosAsync(object sender, int dscp)
+    {
+        if (sender is not MenuFlyoutItem { Tag: SocketRow row }) return;
+        string remoteIp = StripPort(row.RemoteAddress);
+        if (string.IsNullOrEmpty(remoteIp) || remoteIp is "—" or "0.0.0.0" or "::")
+        {
+            SocketStatus.Text = "⚠ This socket has no remote IP — cannot create a destination-specific policy.";
+            return;
+        }
+        if (row.RemotePort <= 0)
+        {
+            SocketStatus.Text = "⚠ No remote port found. Use 'Set app QoS priority' instead.";
+            return;
+        }
+
+        string label = QosPolicyService.PriorityLabel(dscp);
+        SocketStatus.Text = $"Applying {label} to {remoteIp}:{row.RemotePort}/{row.Proto}…";
+
+        // Destination-only policy: no app path — targets exact IP:port for all apps
+        var result = await QosPolicyService.SetPriorityAsync(
+            processPath: "",
+            processName: row.ProcessName,
+            dscp: dscp,
+            destinationIp: remoteIp,
+            destinationPort: row.RemotePort,
+            protocol: row.Proto);
+
+        if (result.Success)
+        {
+            string policyName = QosPolicyService.BuildPolicyName(row.ProcessName, remoteIp, row.RemotePort);
+            SocketStatus.Text =
+                $"✓ {label} applied to {remoteIp}:{row.RemotePort}/{row.Proto} only. " +
+                $"Policy '{policyName}' is active until reboot or removal.";
+            HistoryLogService.AddLog("Socket", row.ProcessName,
+                $"QoS {label} socket-only → {remoteIp}:{row.RemotePort}/{row.Proto}");
+        }
+        else
+        {
+            SocketStatus.Text = $"QoS not applied: {result.Message}";
+        }
+    }
+
+    // ── Auto-expire timer dialog ───────────────────────────────────────────────
+    private async void OnSetSocketQosTimer(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuFlyoutItem { Tag: SocketRow row }) return;
+        string remoteIp  = StripPort(row.RemoteAddress);
+        string policyName = QosPolicyService.BuildPolicyName(row.ProcessName, remoteIp, row.RemotePort);
+
+        var combo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        foreach (var (lbl, mins) in new[] { ("5 minutes", 5), ("15 minutes", 15),
+            ("30 minutes", 30), ("1 hour", 60), ("2 hours", 120) })
+            combo.Items.Add(new ComboBoxItem { Content = lbl, Tag = mins });
+        combo.SelectedIndex = 1;
+
+        var panel = new StackPanel { Spacing = 10 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = $"Auto-remove the QoS policy for {remoteIp}:{row.RemotePort} after:",
+            TextWrapping = TextWrapping.Wrap, FontSize = 13
+        });
+        panel.Children.Add(combo);
+        panel.Children.Add(new TextBlock
+        {
+            Text = $"Policy name: {policyName}",
+            FontSize = 11, Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
+        });
+
+        var dlg = new ContentDialog
+        {
+            Title = "Set QoS Policy Auto-Expire",
+            Content = panel,
+            PrimaryButtonText   = "Set Timer",
+            SecondaryButtonText = "Cancel",
+            XamlRoot = this.XamlRoot
+        };
+        if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+
+        if (combo.SelectedItem is not ComboBoxItem { Tag: int minutes }) return;
+
+        // Cancel any existing timer for this policy
+        if (_qosTimers.TryRemove(policyName, out var oldCts))
+            oldCts.Cancel();
+
+        var cts = new CancellationTokenSource();
+        _qosTimers[policyName] = cts;
+
+        SocketStatus.Text = $"⏱ QoS policy '{policyName}' will auto-expire in {minutes} minute(s).";
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromMinutes(minutes), cts.Token);
+                await QosPolicyService.RemovePolicyAsync(policyName);
+                _qosTimers.TryRemove(policyName, out _);
+                DispatcherQueue.TryEnqueue(() =>
+                    SocketStatus.Text = $"⏰ QoS policy '{policyName}' expired and was removed.");
+            }
+            catch (OperationCanceledException) { /* timer was cancelled — no action needed */ }
+        }, CancellationToken.None);
+    }
+
+    private void OnOpenQosManager(object sender, RoutedEventArgs e)
+        => (App.Window as MainWindow)?.NavigateTo("Qos");
 
     private void OnRefreshSockets(object sender, RoutedEventArgs e) => _ = LoadSocketsAsync();
     private void OnProtoFilterChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();

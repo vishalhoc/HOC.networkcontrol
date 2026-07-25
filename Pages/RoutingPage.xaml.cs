@@ -209,14 +209,10 @@ public sealed partial class RoutingPage : Page
     {
         try
         {
-            var psi = new System.Diagnostics.ProcessStartInfo(exe, args)
-            {
-                Verb = "runas", UseShellExecute = true,
-                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-            };
-            var proc = System.Diagnostics.Process.Start(psi);
-            proc?.WaitForExit(8000);
-            return proc?.ExitCode == 0;
+            (bool ok, _) = exe.Equals("netsh", StringComparison.OrdinalIgnoreCase)
+                ? ElevatedRunner.RunNetsh(args)
+                : ElevatedRunner.RunPowerShell(args);
+            return ok;
         }
         catch { return false; }
     });

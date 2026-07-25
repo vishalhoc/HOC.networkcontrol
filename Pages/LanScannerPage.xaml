@@ -11,27 +11,37 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
+        <!-- ══ Header ══════════════════════════════════════════════════════ -->
         <Border Grid.Row="0" Padding="20,14"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Border CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}">
                         <FontIcon Glyph="&#xE9F5;" FontSize="22" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center" Spacing="2">
                         <TextBlock Text="LAN Scanner" FontSize="18" FontWeight="SemiBold"/>
-                        <TextBlock Text="Discover devices and manage this PC's access to them" FontSize="12" Foreground="Gray"/>
+                        <TextBlock Text="Discover, monitor and control devices on your local network" FontSize="12" Foreground="Gray"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <TextBlock x:Name="ScanStatusText" VerticalAlignment="Center"
-                               FontSize="11" Foreground="Gray"/>
+                    <TextBlock x:Name="ScanStatusText" VerticalAlignment="Center" FontSize="11" Foreground="Gray"/>
+                    <Button x:Name="AutoRefreshBtn" Padding="10,6" Click="OnAutoRefreshToggle"
+                            ToolTipService.ToolTip="Re-ping all found devices every 30 s">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon x:Name="AutoRefreshIcon" Glyph="&#xE895;" FontSize="12"/>
+                            <TextBlock x:Name="AutoRefreshText" Text="Auto-refresh" FontSize="11"/>
+                        </StackPanel>
+                    </Button>
                     <Button x:Name="ScanBtn" Padding="12,6" Click="OnScanToggle"
                             Style="{ThemeResource AccentButtonStyle}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -43,7 +53,35 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1" RowSpacing="12" Margin="16,14,16,14">
+        <!-- ══ ARP Spoof warning banner (hidden unless spoofs are active) ═ -->
+        <Border x:Name="ArpWarningBanner" Grid.Row="1"
+                Padding="16,10" Visibility="Collapsed"
+                Background="#FF6B0000"
+                BorderBrush="#FFCC0000" BorderThickness="0,0,0,2">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE814;" FontSize="16" Foreground="#FFFF6B6B"/>
+                    <StackPanel Spacing="1">
+                        <TextBlock x:Name="ArpBannerTitle"
+                                   Text="⚠ ARP Spoofing Active"
+                                   FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock x:Name="ArpBannerDetail"
+                                   Text="Internet access is being blocked for 0 device(s) via ARP poisoning."
+                                   FontSize="11" Foreground="#FFDDDDDD"/>
+                    </StackPanel>
+                </StackPanel>
+                <Button Grid.Column="1" Content="Stop All" Padding="10,4"
+                        Click="OnStopAllArpSpoof" Foreground="White"
+                        Background="Transparent" BorderBrush="#FFFF6B6B" BorderThickness="1"/>
+            </Grid>
+        </Border>
+
+        <!-- ══ Main content ════════════════════════════════════════════════ -->
+        <Grid Grid.Row="2" RowSpacing="10" Margin="16,12,16,12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -54,38 +92,42 @@
             <Border Grid.Row="0" CornerRadius="10" Padding="14"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
-                <Grid ColumnSpacing="16">
+                <Grid ColumnSpacing="14">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="SubnetBox" Header="IP Range" PlaceholderText="192.168.1.0/24" Text="192.168.1.0/24"/>
                     <NumberBox x:Name="TimeoutBox" Grid.Column="1" Header="Timeout (ms)"
-                               Value="500" Minimum="100" Maximum="3000" SpinButtonPlacementMode="Inline"/>
-                    <ToggleSwitch x:Name="ResolveNames" Grid.Column="2" Header="Hostname Lookup"
-                                  IsOn="True" VerticalAlignment="Bottom"/>
-                    <ToggleSwitch x:Name="ScanPorts" Grid.Column="3" Header="Port Probe"
-                                  IsOn="False" VerticalAlignment="Bottom"/>
-                    <ToggleSwitch x:Name="DiscoverServices" Grid.Column="4" Header="Find smart devices"
-                                  IsOn="True" VerticalAlignment="Bottom"
-                                  ToolTipService.ToolTip="Uses UPnP/SSDP to discover device names, models, and types"/>
+                               Value="500" Minimum="100" Maximum="5000" SpinButtonPlacementMode="Inline"
+                               Width="160"/>
+                    <ToggleSwitch x:Name="ResolveNames"   Grid.Column="2" Header="Hostname"  IsOn="True"  VerticalAlignment="Bottom"/>
+                    <ToggleSwitch x:Name="ScanPorts"      Grid.Column="3" Header="Port probe" IsOn="False" VerticalAlignment="Bottom"/>
+                    <ToggleSwitch x:Name="DiscoverServices" Grid.Column="4" Header="UPnP/SSDP" IsOn="True" VerticalAlignment="Bottom"
+                                  ToolTipService.ToolTip="Discover device names/models from smart TVs, cameras, routers"/>
+                    <ToggleSwitch x:Name="FingerprintOS"  Grid.Column="5" Header="OS Guess"  IsOn="True"  VerticalAlignment="Bottom"
+                                  ToolTipService.ToolTip="Guess device OS via TTL value in ping response"/>
                 </Grid>
             </Border>
 
-            <!-- Summary row -->
+            <!-- Summary stats -->
             <Grid Grid.Row="1" ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Border CornerRadius="8" Padding="12,8"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="2">
-                        <TextBlock Text="Hosts Discovered" FontSize="10" Foreground="Gray"/>
+                        <TextBlock Text="Discovered" FontSize="10" Foreground="Gray"/>
                         <TextBlock x:Name="StatHosts" Text="0" FontSize="18" FontWeight="Bold"
                                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                     </StackPanel>
@@ -110,14 +152,22 @@
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="2">
-                        <TextBlock Text="Scan Progress" FontSize="10" Foreground="Gray"/>
+                        <TextBlock Text="Blocked (ARP)" FontSize="10" Foreground="Gray"/>
+                        <TextBlock x:Name="StatCutOff" Text="0" FontSize="18" FontWeight="Bold" Foreground="#FFCC3300"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="4" CornerRadius="8" Padding="12,8"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Progress" FontSize="10" Foreground="Gray"/>
                         <ProgressBar x:Name="ScanProgressBar" Height="8" CornerRadius="4"
-                                     Maximum="100" Value="0" Margin="0,4,0,0"/>
+                                     Maximum="100" Value="0" Margin="0,5,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
 
-            <!-- Device list -->
+            <!-- Device list card -->
             <Border Grid.Row="2" CornerRadius="12" Padding="0"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
@@ -128,7 +178,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Device controls -->
+                    <!-- Toolbar -->
                     <Border Grid.Row="0" Padding="14,10"
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
                         <Grid>
@@ -138,21 +188,58 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <TextBlock Text="Devices" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <TextBox x:Name="DeviceSearchBox" Width="200" PlaceholderText="Filter IP, name, or MAC…"
+                                <TextBox x:Name="DeviceSearchBox" Width="200"
+                                         PlaceholderText="Filter IP, hostname, MAC, vendor…"
                                          TextChanged="OnDeviceSearchChanged"/>
-                                <ToggleSwitch x:Name="BlockedOnlyToggle" Header="Blocked only" Toggled="OnBlockedOnlyToggled"/>
+                                <ToggleSwitch x:Name="BlockedOnlyToggle" Header="Cut off only" Toggled="OnBlockedOnlyToggled"/>
                             </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                <Button Padding="8,5" Click="OnPingSelected" ToolTipService.ToolTip="Ping the selected device">
-                                    <StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE879;" FontSize="12"/><TextBlock Text="Ping" FontSize="11"/></StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5">
+                                <Button Padding="8,5" Click="OnPingSelected" ToolTipService.ToolTip="Ping selected device">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE879;" FontSize="12"/>
+                                        <TextBlock Text="Ping" FontSize="11"/>
+                                    </StackPanel>
                                 </Button>
-                                <Button Padding="8,5" Click="OnBlockSelected" ToolTipService.ToolTip="Block selected devices from this PC">
-                                    <StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xF140;" FontSize="12" Foreground="#CC3300"/><TextBlock Text="Block Selected" FontSize="11"/></StackPanel>
+                                <Button Padding="8,5" Click="OnTracerouteSelected" ToolTipService.ToolTip="Traceroute to selected device">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="12"/>
+                                        <TextBlock Text="Traceroute" FontSize="11"/>
+                                    </StackPanel>
                                 </Button>
-                                <Button Padding="8,5" Click="OnUnblockSelected" ToolTipService.ToolTip="Restore this PC's access to selected devices">
-                                    <StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE785;" FontSize="12"/><TextBlock Text="Unblock" FontSize="11"/></StackPanel>
+                                <Button Padding="8,5" Click="OnWakeOnLanSelected" ToolTipService.ToolTip="Send Wake-on-LAN magic packet">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE7E8;" FontSize="12"/>
+                                        <TextBlock Text="WoL" FontSize="11"/>
+                                    </StackPanel>
                                 </Button>
-                                <Button Padding="8,5" Click="OnExportDevices" ToolTipService.ToolTip="Export visible devices to CSV">
+                                <Button Padding="8,5" Click="OnCutInternetSelected"
+                                        ToolTipService.ToolTip="Cut internet for selected (ARP spoof)"
+                                        Background="#22CC3300" BorderBrush="#AACC3300">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE814;" FontSize="12" Foreground="#FFCC3300"/>
+                                        <TextBlock Text="Cut Internet" FontSize="11" Foreground="#FFCC3300"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="8,5" Click="OnRestoreInternetSelected"
+                                        ToolTipService.ToolTip="Restore internet for selected (stop ARP spoof)">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE785;" FontSize="12"/>
+                                        <TextBlock Text="Restore" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="8,5" Click="OnBlockSelected" ToolTipService.ToolTip="Block this PC ↔ device (firewall)">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xF140;" FontSize="12" Foreground="#FFAA4400"/>
+                                        <TextBlock Text="Block PC" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="8,5" Click="OnUnblockSelected">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE8F8;" FontSize="12"/>
+                                        <TextBlock Text="Unblock PC" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="8,5" Click="OnExportDevices" ToolTipService.ToolTip="Export to CSV">
                                     <FontIcon Glyph="&#xE898;" FontSize="12"/>
                                 </Button>
                             </StackPanel>
@@ -160,79 +247,146 @@
                     </Border>
 
                     <!-- Column headers -->
-                    <Border Grid.Row="1" Padding="14,10"
-                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
-                        <Grid ColumnSpacing="12">
+                    <Border Grid.Row="1" Padding="14,8"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <Grid ColumnSpacing="10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="110"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="160"/>
-                                <ColumnDefinition Width="160"/>
-                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="115"/>
+                                <ColumnDefinition Width="155"/>
+                                <ColumnDefinition Width="68"/>
+                                <ColumnDefinition Width="95"/>
+                                <ColumnDefinition Width="105"/>
                                 <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="145"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="IP Address" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="1" Text="Hostname" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="2" Text="Type / Vendor" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="3" Text="MAC Address" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="4" Text="Ping" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="5" Text="Open Ports" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="6" Text="Access" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Text="IP Address"   FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="1" Text="Hostname"    FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="2" Text="OS / Type"   FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="3" Text="MAC / Vendor" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="4" Text="Ping"        FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="5" Text="Open Ports"  FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="6" Text="This PC"     FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="7" Text="Internet"    FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
                         </Grid>
                     </Border>
 
+                    <!-- Device rows -->
                     <ListView x:Name="DeviceList" Grid.Row="2" SelectionMode="Multiple">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
-                                <Setter Property="Padding" Value="14,8"/>
+                                <Setter Property="Padding" Value="14,7"/>
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             </Style>
                         </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <Grid ColumnSpacing="12">
+                                <Grid ColumnSpacing="10">
                                     <Grid.ContextFlyout>
                                         <MenuFlyout>
-                                            <MenuFlyoutItem Text="Device details" Click="OnShowDeviceDetails" Tag="{Binding}"/>
-                                            <MenuFlyoutItem Text="Ping now" Click="OnPingDevice" Tag="{Binding}"/>
-                                            <MenuFlyoutItem Text="Copy IP" Click="OnCopyDeviceIp" Tag="{Binding}"/>
-                                            <MenuFlyoutItem Text="Copy MAC" Click="OnCopyDeviceMac" Tag="{Binding}"/>
+                                            <MenuFlyoutItem Text="Device details"  Click="OnShowDeviceDetails" Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="Ping now"        Click="OnPingDevice"        Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE879;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="Traceroute"      Click="OnTracerouteDevice"  Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B7;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="Wake-on-LAN"     Click="OnWakeOnLanDevice"   Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7E8;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutSeparator/>
+                                            <MenuFlyoutItem Text="Cut internet (ARP spoof)" Click="OnCutInternetDevice" Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE814;" Foreground="#FFCC3300"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="Restore internet"         Click="OnRestoreInternetDevice" Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE785;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutSeparator/>
+                                            <MenuFlyoutItem Text="Block this PC ↔ device"  Click="OnBlockDevice"   Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xF140;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="Unblock this PC"          Click="OnUnblockDevice" Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8F8;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutSeparator/>
+                                            <MenuFlyoutItem Text="Copy IP"  Click="OnCopyDeviceIp"  Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="Copy MAC" Click="OnCopyDeviceMac" Tag="{Binding}">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;"/></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
                                         </MenuFlyout>
                                     </Grid.ContextFlyout>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="130"/>
+                                        <ColumnDefinition Width="110"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="160"/>
-                                        <ColumnDefinition Width="160"/>
-                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="115"/>
+                                        <ColumnDefinition Width="155"/>
+                                        <ColumnDefinition Width="68"/>
+                                        <ColumnDefinition Width="95"/>
+                                        <ColumnDefinition Width="105"/>
                                         <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="145"/>
                                     </Grid.ColumnDefinitions>
+
+                                    <!-- IP -->
                                     <TextBlock Text="{Binding Ip}"
                                                FontFamily="Consolas" FontSize="12" FontWeight="SemiBold"
                                                VerticalAlignment="Center"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+
+                                    <!-- Hostname -->
                                     <TextBlock Grid.Column="1" Text="{Binding Hostname}"
                                                FontSize="12" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding TypeVendorText}"
-                                               FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                               ToolTipService.ToolTip="{Binding DeviceDetails}"/>
-                                    <TextBlock Grid.Column="3" Text="{Binding Mac}"
-                                               FontFamily="Consolas" FontSize="11"
-                                               Foreground="Gray" VerticalAlignment="Center"/>
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTipService.ToolTip="{Binding Hostname}"/>
+
+                                    <!-- OS / Type -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding OsIcon}" FontSize="13" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding OsGuess}" FontSize="11" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding TypeVendorText}"/>
+                                    </StackPanel>
+
+                                    <!-- MAC / Vendor -->
+                                    <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="{Binding Mac}"
+                                                   FontFamily="Consolas" FontSize="11" Foreground="Gray"/>
+                                        <TextBlock Text="{Binding Vendor}" FontSize="10" Foreground="DimGray"
+                                                   TextTrimming="CharacterEllipsis" Visibility="{Binding VendorVisibility}"/>
+                                    </StackPanel>
+
+                                    <!-- Ping -->
                                     <TextBlock Grid.Column="4" Text="{Binding PingMs}"
                                                FontSize="12" VerticalAlignment="Center"
                                                Foreground="{Binding PingBrush}"/>
+
+                                    <!-- Open Ports -->
                                     <TextBlock Grid.Column="5" Text="{Binding OpenPorts}"
                                                FontSize="11" Foreground="Gray" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"/>
-                                    <Button Grid.Column="6" Padding="8,4" Click="OnDeviceAccessToggle"
-                                            Tag="{Binding}" ToolTipService.ToolTip="Blocks only this PC's traffic to and from the device">
-                                        <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <FontIcon Glyph="{Binding AccessIcon}" FontSize="11" Foreground="{Binding AccessBrush}"/>
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTipService.ToolTip="{Binding OpenPorts}"/>
+
+                                    <!-- This PC (firewall block) -->
+                                    <Button Grid.Column="6" Padding="6,3" Click="OnDeviceAccessToggle"
+                                            Tag="{Binding}"
+                                            ToolTipService.ToolTip="Block/allow traffic between this PC and the device (Windows Firewall)">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon Glyph="{Binding AccessIcon}" FontSize="10" Foreground="{Binding AccessBrush}"/>
                                             <TextBlock Text="{Binding AccessText}" FontSize="11" Foreground="{Binding AccessBrush}"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Internet (ARP spoof) -->
+                                    <Button Grid.Column="7" Padding="6,3" Click="OnInternetToggle"
+                                            Tag="{Binding}"
+                                            ToolTipService.ToolTip="Cut/restore internet access via ARP spoofing (affects whole network, not just this PC)">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon Glyph="{Binding InternetIcon}" FontSize="10" Foreground="{Binding InternetBrush}"/>
+                                            <TextBlock Text="{Binding InternetText}" FontSize="11" Foreground="{Binding InternetBrush}"/>
                                         </StackPanel>
                                     </Button>
                                 </Grid>

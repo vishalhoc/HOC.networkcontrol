@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using WinNetControl.Core;
 using WinNetControl.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -66,14 +67,9 @@ public sealed partial class NetworkResetPage : Page
 
     private static Task RunAsync(string exe, string args) => Task.Run(() =>
     {
-        var psi = new System.Diagnostics.ProcessStartInfo(exe, args)
-        {
-            UseShellExecute  = true,
-            Verb             = "runas",
-            WindowStyle      = System.Diagnostics.ProcessWindowStyle.Hidden,
-            CreateNoWindow   = true
-        };
-        var proc = System.Diagnostics.Process.Start(psi)!;
-        proc.WaitForExit();
+        if (exe.Equals("netsh", StringComparison.OrdinalIgnoreCase))
+            ElevatedRunner.RunNetsh(args);
+        else
+            ElevatedRunner.RunPowerShell(args);
     });
 }
