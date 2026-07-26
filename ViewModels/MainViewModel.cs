@@ -13,6 +13,9 @@ public partial class MainViewModel : ObservableObject
     private readonly NetworkMonitorService _networkMonitor;
     private readonly NetworkSpeedMonitorService _speedMonitor;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
+    private readonly VirusTotalService _vtService = new();
+    private int _speedSortTickCount; // throttles speed-based re-sorts to every ~4.5 s
+
 
     public AppConfig CurrentConfig { get; internal set; }
     public HttpProxyService ProxyService { get; }
@@ -45,7 +48,7 @@ public partial class MainViewModel : ObservableObject
 
         ProxyService = new HttpProxyService(this);
 
-        _networkMonitor = new NetworkMonitorService();
+        _networkMonitor = new NetworkMonitorService(_dispatcherQueue);
 
         // Seed phantom blocked entries so they persist even without active internet
         foreach (var name in CurrentConfig.BlockedApps)
@@ -149,6 +152,23 @@ public partial class MainViewModel : ObservableObject
     partial void OnGlobalTotalDataUsedChanged(long value)    => OnPropertyChanged(nameof(GlobalTotalText));
     partial void OnGlobalTotalSentChanged(long value)        => OnPropertyChanged(nameof(GlobalTotalSentText));
     partial void OnGlobalTotalReceivedChanged(long value)    => OnPropertyChanged(nameof(GlobalTotalReceivedText));
+
+    // Last-refreshed indicator — updated at the end of every OnConnectionsUpdated tick
+    [ObservableProperty] private DateTime _lastRefreshed = DateTime.Now;
+    public string LastRefreshedText
+    {
+        get
+        {
+            var elapsed = DateTime.Now - LastRefreshed;  // use generated property, not backing field
+            if (elapsed.TotalSeconds <  5)  return "Updated just now";
+            if (elapsed.TotalSeconds < 60)  return $"Updated {(int)elapsed.TotalSeconds}s ago";
+            return $"Updated {(int)elapsed.TotalMinutes}m ago";
+        }
+    }
+    partial void OnLastRefreshedChanged(DateTime value) => OnPropertyChanged(nameof(LastRefreshedText));
+
+    /// <summary>Triggers an immediate poll without waiting for the 1.5-second cycle.</summary>
+    public void ForceRefresh() => _networkMonitor.ForceRefresh();
 
     internal static string FormatSpeed(double kbps)
     {
@@ -278,146 +298,208 @@ public partial class MainViewModel : ObservableObject
     // ── Connections update handler ────────────────────────────────────────────
     private void OnConnectionsUpdated(System.Collections.Generic.IEnumerable<ProcessNetworkInfo> activeProcesses)
     {
+        // Snapshot connections on background thread before dispatching (thread-safety)
+        var frozenSnapshot = activeProcesses
+            .Select(p => (proc: p, conns: p.CurrentConnections.ToList()))
+            .ToList();
+
         _dispatcherQueue?.TryEnqueue(() =>
         {
-            var existingPids = new System.Collections.Generic.HashSet<int>();
-
-            foreach (var newProc in activeProcesses)
+            try
             {
-                existingPids.Add(newProc.ProcessId);
+                var existingPids = new System.Collections.Generic.HashSet<int>();
+                bool anyStructuralChange = false; // tracks add/remove/block visibility change
 
-                var existingProc = Processes.FirstOrDefault(p => p.ProcessId == newProc.ProcessId);
-                if (existingProc != null)
+                foreach (var (newProc, currentConns) in frozenSnapshot)
                 {
-                    existingProc.IsPhantom = newProc.IsPhantom;
+                    existingPids.Add(newProc.ProcessId);
 
-                    // Merge connections
-                    var newConnKeys = new System.Collections.Generic.HashSet<string>();
-                    foreach (var c in newProc.CurrentConnections)
+                    var existingProc = Processes.FirstOrDefault(p =>
+                        p.ProcessId == newProc.ProcessId &&
+                        string.Equals(p.ProcessName, newProc.ProcessName, StringComparison.OrdinalIgnoreCase));
+
+                    if (existingProc != null)
                     {
-                        string key = $"{c.Protocol}-{c.LocalPort}-{c.RemotePort}";
-                        newConnKeys.Add(key);
-                        var existing = existingProc.Connections.FirstOrDefault(
-                            o => o.Protocol == c.Protocol && o.LocalPort == c.LocalPort && o.RemotePort == c.RemotePort);
-                        if (existing != null)
-                            existing.State = c.State;
-                        else
+                        // Track visibility change (phantom toggle affects filter)
+                        if (existingProc.IsPhantom != newProc.IsPhantom)
                         {
-                            existingProc.Connections.Add(c);
-                            EnrichGeoIp(c); // (#18)
+                            existingProc.IsPhantom = newProc.IsPhantom;
+                            anyStructuralChange = true;
+                        }
+
+                        // FLICKER FIX: skip connection merging for blocked/phantom processes.
+                        // Blocked processes have no live TCP connections (firewalled) so
+                        // currentConns is empty every tick. Merging would RemoveAt() every
+                        // existing connection, firing CollectionChanged repeatedly → shimmer.
+                        // Their connections are already correct from when they were active.
+                        if (!existingProc.IsBlocked && !existingProc.IsPhantom)
+                        {
+                            var newConnKeys = new System.Collections.Generic.HashSet<string>();
+                            foreach (var c in currentConns)
+                            {
+                                string key = $"{c.Protocol}-{c.LocalPort}-{c.RemotePort}";
+                                newConnKeys.Add(key);
+                                var existing = existingProc.Connections.FirstOrDefault(
+                                    o => o.Protocol == c.Protocol && o.LocalPort == c.LocalPort && o.RemotePort == c.RemotePort);
+                                if (existing != null)
+                                    existing.State = c.State;
+                                else
+                                {
+                                    existingProc.Connections.Add(c);
+                                    EnrichGeoIp(c);
+                                }
+                            }
+
+                            for (int j = existingProc.Connections.Count - 1; j >= 0; j--)
+                            {
+                                var o   = existingProc.Connections[j];
+                                string key = $"{o.Protocol}-{o.LocalPort}-{o.RemotePort}";
+                                if (!newConnKeys.Contains(key))
+                                    existingProc.Connections.RemoveAt(j);
+                            }
+
+                            existingProc.RefreshConnectionStats();
                         }
                     }
-
-                    for (int j = existingProc.Connections.Count - 1; j >= 0; j--)
+                    else
                     {
-                        var o   = existingProc.Connections[j];
-                        string key = $"{o.Protocol}-{o.LocalPort}-{o.RemotePort}";
-                        if (!newConnKeys.Contains(key))
-                            existingProc.Connections.RemoveAt(j);
-                    }
-                    
-                    existingProc.RefreshConnectionStats();
-                }
-                else
-                {
-                    // Restore saved config states
-                    string name = newProc.ProcessName;
-                    newProc.IsPinned          = CurrentConfig.PinnedApps.Contains(name);
-                    newProc.IsHttpCaptureEnabled = CurrentConfig.HttpCaptureApps.Contains(name);
+                        // ── New process ─────────────────────────────────────────────────
+                        anyStructuralChange = true;
 
-                    bool isBlocked = CurrentConfig.BlockedApps.Contains(name);
-                    newProc.IsBlocked    = isBlocked;
-                    newProc.BlockInbound  = CurrentConfig.BlockedAppsInbound.Contains(name);
-                    newProc.BlockOutbound = CurrentConfig.BlockedAppsOutbound.Contains(name);
-                    if (isBlocked && !newProc.BlockInbound && !newProc.BlockOutbound)
-                    {
-                        newProc.BlockInbound  = true;
-                        newProc.BlockOutbound = true;
-                    }
+                        // If PID exists with different name (OS reuse), remove stale entry
+                        var stale = Processes.FirstOrDefault(p =>
+                            p.ProcessId == newProc.ProcessId && !p.IsPhantom);
+                        if (stale != null) Processes.Remove(stale);
 
-                    // Auto-block new apps if the global mode is enabled
-                    if (!isBlocked && BlockNewApps && !string.IsNullOrWhiteSpace(newProc.ProcessPath))
-                    {
-                        newProc.IsBlocked    = true;
-                        newProc.BlockInbound  = true;
-                        newProc.BlockOutbound = true;
-                        if (!CurrentConfig.BlockedApps.Contains(name)) CurrentConfig.BlockedApps.Add(name);
-                        CurrentConfig.BlockedAppsInbound.Add(name);
-                        CurrentConfig.BlockedAppsOutbound.Add(name);
-                        _networkMonitor.KnownBlockedNames.Add(name);
-                        string snapPath = newProc.ProcessPath;
-                        System.Threading.Tasks.Task.Run(() => FirewallService.BlockApp(name, snapPath, true, true));
-                    }
-                    else if (!isBlocked)
-                    {
-                        // (#30) Alert: notify user about a new network process they haven't seen before
-                        ShowNewAppToast(name, newProc.ProcessPath ?? "");
-                    }
+                        string name = newProc.ProcessName;
+                        newProc.IsPinned             = CurrentConfig.PinnedApps.Contains(name);
+                        newProc.IsHttpCaptureEnabled = CurrentConfig.HttpCaptureApps.Contains(name);
 
-                    // Restore per-connection blocks
-                    foreach (var c in newProc.CurrentConnections)
-                    {
-                        var rec = CurrentConfig.BlockedConnections.FirstOrDefault(r =>
-                            string.Equals(r.ProcessName, name, StringComparison.OrdinalIgnoreCase) &&
-                            r.RemoteAddress == c.RemoteAddress && r.RemotePort == c.RemotePort);
-                        if (rec != null) { c.IsBlocked = true; c.BlockInbound = rec.BlockInbound; c.BlockOutbound = rec.BlockOutbound; }
-                    }
-
-                    newProc.Connections.Clear();
-                    foreach (var c in newProc.CurrentConnections)
-                    {
-                        newProc.Connections.Add(c);
-                        EnrichGeoIp(c); // (#18)
-                    }
-                    newProc.RefreshConnectionStats();
-
-                    // Remove phantom placeholder if the real process appeared
-                    var phantom = Processes.FirstOrDefault(p => p.IsPhantom &&
-                        string.Equals(p.ProcessName, name, StringComparison.OrdinalIgnoreCase));
-                    if (phantom != null) Processes.Remove(phantom);
-
-                    if (CurrentConfig.AppNotes.TryGetValue(name, out string? appNotes))
-                        newProc.Notes = appNotes;
-
-                    Processes.Add(newProc);
-
-                    if (!string.IsNullOrWhiteSpace(newProc.ProcessPath))
-                    {
-                        System.Threading.Tasks.Task.Run(async () =>
+                        bool isBlocked = CurrentConfig.BlockedApps.Contains(name);
+                        newProc.IsBlocked    = isBlocked;
+                        newProc.BlockInbound  = CurrentConfig.BlockedAppsInbound.Contains(name);
+                        newProc.BlockOutbound = CurrentConfig.BlockedAppsOutbound.Contains(name);
+                        if (isBlocked && !newProc.BlockInbound && !newProc.BlockOutbound)
                         {
-                            var img = await IconCache.GetIconAsync(newProc.ProcessPath);
-                            if (img != null)
-                            {
-                                _dispatcherQueue.TryEnqueue(() => newProc.AppIcon = img);
-                            }
-                        });
-                    }
+                            newProc.BlockInbound  = true;
+                            newProc.BlockOutbound = true;
+                        }
 
-                    // Re-apply firewall rule off the UI thread
-                    if (newProc.IsBlocked && !string.IsNullOrWhiteSpace(newProc.ProcessPath))
-                    {
-                        string snapPath = newProc.ProcessPath;
-                        bool snapIn = newProc.BlockInbound, snapOut = newProc.BlockOutbound;
-                        System.Threading.Tasks.Task.Run(() =>
-                            FirewallService.BlockApp(name, snapPath, snapIn, snapOut));
+                        if (!isBlocked && BlockNewApps && !string.IsNullOrWhiteSpace(newProc.ProcessPath))
+                        {
+                            newProc.IsBlocked    = true;
+                            newProc.BlockInbound  = true;
+                            newProc.BlockOutbound = true;
+                            if (!CurrentConfig.BlockedApps.Contains(name)) CurrentConfig.BlockedApps.Add(name);
+                            CurrentConfig.BlockedAppsInbound.Add(name);
+                            CurrentConfig.BlockedAppsOutbound.Add(name);
+                            _networkMonitor.KnownBlockedNames.Add(name);
+                            string snapPath = newProc.ProcessPath;
+                            System.Threading.Tasks.Task.Run(() => FirewallService.BlockApp(name, snapPath, true, true));
+                        }
+                        else if (!isBlocked)
+                        {
+                            ShowNewAppToast(name, newProc.ProcessPath ?? "");
+                        }
+
+                        foreach (var c in currentConns)
+                        {
+                            var rec = CurrentConfig.BlockedConnections.FirstOrDefault(r =>
+                                string.Equals(r.ProcessName, name, StringComparison.OrdinalIgnoreCase) &&
+                                r.RemoteAddress == c.RemoteAddress && r.RemotePort == c.RemotePort);
+                            if (rec != null) { c.IsBlocked = true; c.BlockInbound = rec.BlockInbound; c.BlockOutbound = rec.BlockOutbound; }
+                        }
+
+                        newProc.Connections.Clear();
+                        foreach (var c in currentConns) { newProc.Connections.Add(c); EnrichGeoIp(c); }
+                        newProc.RefreshConnectionStats();
+
+                        newProc.IsNewlyDiscovered = true;
+                        newProc.DiscoveredAt      = DateTime.Now;
+
+                        var phantom = Processes.FirstOrDefault(p => p.IsPhantom &&
+                            string.Equals(p.ProcessName, name, StringComparison.OrdinalIgnoreCase));
+                        if (phantom != null) Processes.Remove(phantom);
+
+                        if (CurrentConfig.AppNotes.TryGetValue(name, out string? appNotes))
+                            newProc.Notes = appNotes;
+
+                        Processes.Add(newProc);
+
+                        // Restore cached VT result (no API call — instant from disk)
+                        if (!string.IsNullOrWhiteSpace(newProc.ProcessPath))
+                        {
+                            var cached = _vtService.TryGetCachedByPath(newProc.ProcessPath);
+                            if (cached != null)
+                            {
+                                newProc.VtStatus = cached.Status;
+                                newProc.VtScore  = cached.Message;
+                            }
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(newProc.ProcessPath))
+                        {
+                            System.Threading.Tasks.Task.Run(async () =>
+                            {
+                                var img = await IconCache.GetIconAsync(newProc.ProcessPath);
+                                if (img != null)
+                                    _dispatcherQueue.TryEnqueue(() => newProc.AppIcon = img);
+                            });
+                        }
+
+                        if (newProc.IsBlocked && !string.IsNullOrWhiteSpace(newProc.ProcessPath))
+                        {
+                            string snapPath = newProc.ProcessPath;
+                            bool snapIn = newProc.BlockInbound, snapOut = newProc.BlockOutbound;
+                            System.Threading.Tasks.Task.Run(() =>
+                                FirewallService.BlockApp(name, snapPath, snapIn, snapOut));
+                        }
                     }
                 }
-            }
 
-            // Remove dead non-blocked non-phantom processes
-            for (int i = Processes.Count - 1; i >= 0; i--)
+                // Remove dead non-blocked non-phantom processes
+                for (int i = Processes.Count - 1; i >= 0; i--)
+                {
+                    var p = Processes[i];
+                    if (!existingPids.Contains(p.ProcessId) && !p.IsBlocked && !p.IsPhantom)
+                    {
+                        Processes.RemoveAt(i);
+                        anyStructuralChange = true;
+                    }
+                }
+
+                // Expire "NEW" badge after 30 s
+                foreach (var p in Processes)
+                    if (p.IsNewlyDiscovered && (DateTime.Now - p.DiscoveredAt).TotalSeconds > 30)
+                        p.IsNewlyDiscovered = false;
+
+                LastRefreshed = DateTime.Now;
+                OnPropertyChanged(nameof(LastRefreshedText));
+                if (anyStructuralChange) OnPropertyChanged(nameof(BlockedCountText));
+
+                // Speed-sort throttle: re-sorting every 1.5 s causes continuous Move() calls
+                // on FilteredProcesses → animation on every tick → visible jitter.
+                // Structural changes always sort immediately; speed re-sort is capped to every 4 s.
+                _speedSortTickCount++;
+                bool speedSort = (SelectedSort == "Upload Speed" ||
+                                  SelectedSort == "Download Speed" ||
+                                  SelectedSort == "Data Used (High-Low)") &&
+                                  _speedSortTickCount % 3 == 0; // every 3rd tick ≈ 4.5 s
+                if (anyStructuralChange || speedSort)
+                    ApplyFilterAndSort();
+            }
+            catch (Exception ex)
             {
-                var p = Processes[i];
-                if (!existingPids.Contains(p.ProcessId) && !p.IsBlocked && !p.IsPhantom)
-                    Processes.RemoveAt(i);
+                System.Diagnostics.Debug.WriteLine($"[ConnectionManager] OnConnectionsUpdated: {ex.Message}\n{ex.StackTrace}");
             }
-
-            OnPropertyChanged(nameof(BlockedCountText));
-            ApplyFilterAndSort();
         });
     }
 
+
+
+
     // ── Filter & Sort ─────────────────────────────────────────────────────────
+
     public void ApplyFilterAndSort()
     {
         System.Collections.Generic.IEnumerable<ProcessNetworkInfo> query = Processes;
@@ -435,7 +517,6 @@ public partial class MainViewModel : ObservableObject
         else if (SelectedFilter != "All")
             query = query.Where(p => p.AppType == SelectedFilter);
 
-        // Protocol filter (#9)
         if (SelectedProtocol == "TCP only")
             query = query.Where(p => p.Connections.Any(c => c.Protocol.StartsWith("TCP", StringComparison.OrdinalIgnoreCase))
                                   && !p.Connections.Any(c => c.Protocol.StartsWith("UDP", StringComparison.OrdinalIgnoreCase)));
@@ -456,6 +537,27 @@ public partial class MainViewModel : ObservableObject
 
         var sortedList = orderedQuery.ToList();
 
+        // FLICKER FIX: if the resulting sorted list is already identical to FilteredProcesses
+        // (same items in same order), skip all ObservableCollection mutations entirely.
+        // Each Insert/Move/Remove fires CollectionChanged which causes the ListView to
+        // re-render. On a 1.5-second tick with nothing changing this was causing constant
+        // visual shimmer. Reference-equality is O(n) and extremely fast.
+        if (sortedList.Count == FilteredProcesses.Count)
+        {
+            bool identical = true;
+            for (int i = 0; i < sortedList.Count; i++)
+            {
+                if (!ReferenceEquals(sortedList[i], FilteredProcesses[i])) { identical = false; break; }
+            }
+            if (identical)
+            {
+                // Still update TopConsumers (it uses TotalDataUsed which changes every tick)
+                UpdateTopConsumers();
+                return;
+            }
+        }
+
+        // Apply minimum-diff update to avoid full ListView rebuild
         for (int i = FilteredProcesses.Count - 1; i >= 0; i--)
             if (!sortedList.Contains(FilteredProcesses[i]))
                 FilteredProcesses.RemoveAt(i);
@@ -468,7 +570,12 @@ public partial class MainViewModel : ObservableObject
             else if (cur != i) FilteredProcesses.Move(cur, i);
         }
 
-        // Update Top 5 consumers (#12)
+        UpdateTopConsumers();
+    }
+
+    private void UpdateTopConsumers()
+    {
+        // Update Top 5 consumers
         var top5 = Processes
             .Where(p => !p.IsPhantom && p.TotalDataUsed > 0)
             .OrderByDescending(p => p.TotalDataUsed)
@@ -849,7 +956,17 @@ public partial class MainViewModel : ObservableObject
                         process.IsSuspicious = noPath || tempPath || randName;
                     }
                 }
-                else { process.UploadSpeed = 0; process.DownloadSpeed = 0; }
+                else
+                {
+                    // SPARKLINE FIX: always push a 0-speed sample for processes not seen
+                    // in this ETW window. Without this, idle processes skip ticks entirely
+                    // and the 30-point ring buffer advances unevenly — making the graph
+                    // look like it updates at an irregular rate.
+                    process.UploadSpeed   = 0;
+                    process.DownloadSpeed = 0;
+                    process.PushSpeedSample(0);
+                }
+
 
                 // Register ETW-observed connections
                 foreach (var kvp in connSpeedData)
@@ -923,14 +1040,90 @@ public partial class MainViewModel : ObservableObject
             // Exclude phantoms from total data (they have no real traffic)
             var nonPhantoms = Processes.Where(p => !p.IsPhantom).ToList();
             GlobalTotalDataUsed  = nonPhantoms.Sum(p => p.TotalDataUsed);
-            // Sent = upload bytes, Received = download bytes (per-process accumulators from speed monitor)
             GlobalTotalSent     = nonPhantoms.Sum(p =>
                 speedData.TryGetValue(p.ProcessId, out var si) ? si.TotalUploadBytes   : 0L);
             GlobalTotalReceived = nonPhantoms.Sum(p =>
                 speedData.TryGetValue(p.ProcessId, out var si) ? si.TotalDownloadBytes : 0L);
+            // Note: speed-based re-sort is handled by the throttle in OnConnectionsUpdated
+        });
+    }
 
-            if (SelectedSort is "Upload Speed" or "Download Speed" or "Data Used (High-Low)")
-                ApplyFilterAndSort();
+    // ── VirusTotal ───────────────────────────────────────────────────────────────
+
+    /// <summary>VirusTotal API key — read from AppConfig, editable in Settings.</summary>
+    public string VtApiKey
+    {
+        get => CurrentConfig?.VirusTotalApiKey ?? string.Empty;
+        set
+        {
+            if (CurrentConfig != null)
+            {
+                CurrentConfig.VirusTotalApiKey = value;
+                OnPropertyChanged(nameof(VtApiKey));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Kicks off a VirusTotal scan for the given process.
+    /// - Cache hit  → instant result, no API call, no spinner.
+    /// - Cache miss → shows Checking…, fires API, updates to real result.
+    /// - Error/NotFound cache → forces a fresh API call so user can retry.
+    /// </summary>
+    public async System.Threading.Tasks.Task CheckVirusTotalAsync(Models.ProcessNetworkInfo process)
+    {
+        if (process == null || string.IsNullOrWhiteSpace(process.ProcessPath)) return;
+        if (string.IsNullOrWhiteSpace(VtApiKey))
+        {
+            process.VtStatus = Core.VtStatus.Error;
+            process.VtScore  = "No API key — add one in Settings";
+            return;
+        }
+
+        // Fast-path: return cached result for clean/suspicious/malicious hits
+        // (skip cache for Error/NotFound so the user can force a retry by clicking again)
+        var cached = _vtService.TryGetCachedByPath(process.ProcessPath);
+        if (cached != null &&
+            cached.Status != Core.VtStatus.Error &&
+            cached.Status != Core.VtStatus.NotFound)
+        {
+            process.VtStatus = cached.Status;
+            process.VtScore  = cached.Message;
+            return;
+        }
+
+        // Show checking state synchronously (already on UI thread via async void caller)
+        process.VtStatus = Core.VtStatus.Checking;
+        process.VtScore  = string.Empty;
+
+        VtResult result;
+        try
+        {
+            result = await _vtService.CheckFileAsync(process.ProcessPath, VtApiKey);
+        }
+        catch (Exception ex)
+        {
+            result = new VtResult { Status = Core.VtStatus.Error, Message = $"Unexpected: {ex.Message}" };
+        }
+
+        // Friendly score labels for non-numeric statuses
+        string displayScore = result.Status switch
+        {
+            Core.VtStatus.NotFound => "Not in DB",
+            Core.VtStatus.Error    => result.Message switch
+            {
+                var m when m.Contains("Rate limit") => "Quota exceeded",
+                var m when m.Contains("Invalid API") => "Bad API key",
+                var m when m.Contains("Network")    => "Network error",
+                _                                   => result.Message
+            },
+            _ => result.Message
+        };
+
+        _dispatcherQueue?.TryEnqueue(() =>
+        {
+            process.VtStatus = result.Status;
+            process.VtScore  = displayScore;
         });
     }
 

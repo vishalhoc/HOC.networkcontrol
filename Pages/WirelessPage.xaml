@@ -135,9 +135,25 @@
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="10">
                         <Grid>
-                            <TextBlock Text="Nearby Networks" FontSize="13" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="NetworkCount" HorizontalAlignment="Right"
-                                       FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xEC3B;" FontSize="14"
+                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                          VerticalAlignment="Center"/>
+                                <TextBlock Text="Nearby Networks" FontSize="13" FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="NetworkCount" FontSize="11" Foreground="Gray"
+                                           VerticalAlignment="Center"/>
+                                <ProgressRing x:Name="ScanRing" IsActive="False" Width="16" Height="16"
+                                              VerticalAlignment="Center" Visibility="Collapsed"/>
+                            </StackPanel>
+                            <Button HorizontalAlignment="Right" Padding="10,5"
+                                    Click="OnScanNetworks" VerticalAlignment="Center"
+                                    Style="{ThemeResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72C;" FontSize="11"/>
+                                    <TextBlock Text="Scan Nearby" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
                         </Grid>
 
                         <Grid ColumnSpacing="12">
@@ -145,14 +161,16 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="80"/>
                                 <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="74"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="SSID" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
                             <TextBlock Grid.Column="1" Text="Signal" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
                             <TextBlock Grid.Column="2" Text="Auth" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
                             <TextBlock Grid.Column="3" Text="Band" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="4" Text="Channel" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="4" Text="Ch" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="5" Text="Action" FontSize="11" Foreground="Gray" FontWeight="SemiBold"/>
                         </Grid>
                         <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}"/>
 
@@ -170,8 +188,9 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="80"/>
                                             <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="80"/>
-                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="74"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Spacing="2">
                                             <TextBlock Text="{Binding Ssid}" FontSize="12" FontWeight="SemiBold"
@@ -187,15 +206,135 @@
                                                          Width="60" HorizontalAlignment="Left"/>
                                         </StackPanel>
                                         <TextBlock Grid.Column="2" Text="{Binding Auth}"
-                                                   FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                                   FontSize="11" Foreground="Gray" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Grid.Column="3" Text="{Binding Band}"
                                                    FontSize="11" VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="4" Text="{Binding Channel}"
                                                    FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
+                                        <!-- Target button -->
+                                        <Button Grid.Column="5" Tag="{Binding}" Padding="6,3"
+                                                Click="OnSelectNetworkClicked"
+                                                HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <FontIcon Glyph="&#xE915;" FontSize="10"/>
+                                                <TextBlock Text="Target" FontSize="10"/>
+                                            </StackPanel>
+                                        </Button>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
+                    </StackPanel>
+                </Border>
+
+                <!-- Attack Target Panel (shown after clicking Target on a network) -->
+                <Border x:Name="AttackTargetPanel" CornerRadius="12" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource AccentTextFillColorPrimaryBrush}" BorderThickness="1"
+                        Visibility="Collapsed">
+                    <StackPanel Spacing="12">
+                        <!-- Header -->
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE915;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Attack Target" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <Button Padding="6,2" Click="OnClearTarget" FontSize="10"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center">
+                                <TextBlock Text="Clear"/>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Selected network info -->
+                        <Border CornerRadius="8" Padding="10"
+                                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                            <Grid ColumnSpacing="10" RowSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                <TextBlock Text="SSID" Foreground="Gray" FontSize="11"/>
+                                <TextBlock x:Name="TargetSsid" Grid.Column="1" FontSize="11" FontWeight="SemiBold" Text="—"/>
+                                <TextBlock Grid.Column="2" Text="Auth" Foreground="Gray" FontSize="11"/>
+                                <TextBlock x:Name="TargetAuth" Grid.Column="3" FontSize="11" Text="—"/>
+                                <TextBlock Grid.Row="1" Text="BSSID" Foreground="Gray" FontSize="11"/>
+                                <TextBlock x:Name="TargetBssid" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3"
+                                           FontSize="11" FontFamily="Consolas"
+                                           IsTextSelectionEnabled="True" Text="—"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Attack options -->
+                        <TextBlock Text="Attack Options" FontSize="12" FontWeight="SemiBold"/>
+                        <Grid ColumnSpacing="8" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+
+                            <!-- WPA Handshake -->
+                            <Button HorizontalAlignment="Stretch" Padding="0,10" Click="OnWpaHandshake">
+                                <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8D4;" FontSize="20" Foreground="#0078D4"/>
+                                    <TextBlock Text="WPA Handshake" FontSize="11" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Capture 4-way handshake" FontSize="9" Foreground="Gray"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- PMKID -->
+                            <Button Grid.Column="1" HorizontalAlignment="Stretch" Padding="0,10" Click="OnPmkidAttack">
+                                <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8A5;" FontSize="20" Foreground="#FF8C00"/>
+                                    <TextBlock Text="PMKID Capture" FontSize="11" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="No client needed" FontSize="9" Foreground="Gray"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Deauth -->
+                            <Button Grid.Row="1" HorizontalAlignment="Stretch" Padding="0,10" Click="OnDeauthFlood">
+                                <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xEC3B;" FontSize="20" Foreground="#C42B1C"/>
+                                    <TextBlock Text="Deauth Flood" FontSize="11" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Force reconnection" FontSize="9" Foreground="Gray"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Crack with GPU -->
+                            <Button Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Padding="0,10"
+                                    Click="OnGoToGpuCracker" Style="{ThemeResource AccentButtonStyle}">
+                                <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE950;" FontSize="20"/>
+                                    <TextBlock Text="Crack Password" FontSize="11" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Open GPU Cracker" FontSize="9"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Requirements notice -->
+                        <Border CornerRadius="6" Padding="8,6"
+                                Background="#0AFF8C00" BorderBrush="#22FF8C00" BorderThickness="1">
+                            <TextBlock FontSize="10" Foreground="Gray" TextWrapping="Wrap"
+                                       Text="⚠ Handshake and Deauth require a monitor-mode USB Wi-Fi adapter (e.g. Alfa AWUS036ACH). PMKID may work on some adapters without monitor mode. 'Crack Password' works on any system with the .hc22000 file."/>
+                        </Border>
+
+                        <!-- Attack output -->
+                        <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
+                            <TextBox x:Name="AttackOutputBox" IsReadOnly="True" TextWrapping="Wrap"
+                                     FontFamily="Consolas" FontSize="10" AcceptsReturn="True"
+                                     MinHeight="60" Background="#0A000000"/>
+                        </ScrollViewer>
                     </StackPanel>
                 </Border>
 

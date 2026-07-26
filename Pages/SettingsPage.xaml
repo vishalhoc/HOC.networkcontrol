@@ -370,6 +370,39 @@
                     </StackPanel>
                 </Border>
 
+                <!-- ── API Keys ── -->
+                <Border CornerRadius="12" Padding="18"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE8D7;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="API Keys" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- VirusTotal -->
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="VirusTotal API Key" FontSize="12" FontWeight="SemiBold"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                           Text="Free key from virustotal.com/gui/my-apikey"/>
+                            </StackPanel>
+                            <PasswordBox Grid.Column="1" x:Name="VtApiKeyBox"
+                                         PlaceholderText="Paste your VT API key here…"
+                                         LostFocus="OnVtApiKeyLostFocus"
+                                         VerticalAlignment="Center"/>
+                            <Button Grid.Column="2" Content="Get free key"
+                                    Click="OnOpenVtSite" VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="Opens virustotal.com in your browser"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
                 <!-- ── About & Updates ── -->
                 <Border CornerRadius="12" Padding="18"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

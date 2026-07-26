@@ -12,6 +12,24 @@ namespace WinNetControl.Core;
 
 public class NetworkMonitorService
 {
+    // UI-thread dispatcher — required to marshal PropertyChanged events safely
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue? _dispatcher;
+
+    public NetworkMonitorService() { }
+
+    public NetworkMonitorService(Microsoft.UI.Dispatching.DispatcherQueue dispatcher)
+    {
+        _dispatcher = dispatcher;
+    }
+
+    // Helper: run action on UI thread if dispatcher available, otherwise run inline
+    private void RunOnUi(Action action)
+    {
+        if (_dispatcher != null)
+            _dispatcher.TryEnqueue(() => { try { action(); } catch { } });
+        else
+            try { action(); } catch { }
+    }
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
 
@@ -105,7 +123,7 @@ public class NetworkMonitorService
             while (_isRunning)
             {
                 UpdateConnections();
-                await Task.Delay(2000);
+                await Task.Delay(1500); // was 2000 — faster detection of new apps
             }
         });
     }
@@ -115,8 +133,16 @@ public class NetworkMonitorService
         _isRunning = false;
     }
 
+    /// <summary>Triggers an immediate connection update outside of the normal poll cycle.</summary>
+    public void ForceRefresh() => System.Threading.Tasks.Task.Run(() => UpdateConnections());
+
     private void UpdateConnections()
     {
+        // FIX: wrap the ENTIRE method body in try/catch.  Previously only the TCP/UDP
+        // getter was guarded. Any exception thrown in the processMap loop or phantom update
+        // would propagate to the Task.Run and silently kill the update loop forever.
+        try
+        {
         var connections = new List<ProcessConnection>();
         List<ProcessNetworkInfo> snapshot;
         try
@@ -179,11 +205,17 @@ public class NetworkMonitorService
                     info.CurrentConnections.Add(conn);
                 }
 
-                // Resolve adapter from first local IP
+                // Resolve adapter from first local IP — marshal to UI thread
                 if (string.IsNullOrEmpty(info.AdapterName) && info.CurrentConnections.Count > 0)
                 {
                     string localIp = info.CurrentConnections[0].LocalAddress;
-                    info.AdapterName = GetAdapterNameForLocalIp(localIp);
+                    string adapterName = GetAdapterNameForLocalIp(localIp);
+                    if (!string.IsNullOrEmpty(adapterName))
+                    {
+                        var capturedInfo = info;
+                        var capturedName = adapterName;
+                        RunOnUi(() => capturedInfo.AdapterName = capturedName);
+                    }
                 }
             }
             
@@ -212,16 +244,26 @@ public class NetworkMonitorService
                 _missCounts.Remove(pid);
             }
 
-            // Mark processes with no active connections as phantom
-            foreach (var kvp in _processMap)
+            // Mark processes with no active connections as phantom — marshal to UI thread
+            var phantomUpdates = _processMap
+                .Select(kvp => (info: kvp.Value, isPhantom: !activePids.Contains(kvp.Key)))
+                .ToList();
+            RunOnUi(() =>
             {
-                kvp.Value.IsPhantom = !activePids.Contains(kvp.Key);
-            }
+                foreach (var (phantomInfo, isPhantom) in phantomUpdates)
+                    phantomInfo.IsPhantom = isPhantom;
+            });
             
             snapshot = _processMap.Values.ToList();
         }
         
         OnConnectionsUpdated?.Invoke(snapshot);
+        } // end outer try
+        catch (Exception ex)
+        {
+            try { System.IO.File.AppendAllText("network_error.log", $"[Monitor] {DateTime.Now}: {ex.Message}\n{ex.StackTrace}\n"); } catch {}
+            // Do NOT rethrow — this keeps the polling loop alive even after unexpected errors.
+        }
     }
 
     private string GetProcessName(int pid)

@@ -268,3 +268,25 @@ public class SuspiciousToBrushConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, string language)
         => throw new NotImplementedException();
 }
+
+/// <summary>Maps VtStatus to a foreground brush for the VT badge text.</summary>
+public class VtStatusToForegroundConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is WinNetControl.Core.VtStatus status)
+        {
+            return status switch
+            {
+                WinNetControl.Core.VtStatus.Clean      => new SolidColorBrush(Color.FromArgb(255, 16,  124, 16)),   // green
+                WinNetControl.Core.VtStatus.Suspicious => new SolidColorBrush(Color.FromArgb(255, 220, 150, 0)),    // amber
+                WinNetControl.Core.VtStatus.Malicious  => new SolidColorBrush(Color.FromArgb(255, 196, 43,  28)),   // red
+                WinNetControl.Core.VtStatus.Checking   => new SolidColorBrush(Color.FromArgb(255, 0,   120, 212)),  // blue
+                _                                      => new SolidColorBrush(Color.FromArgb(255, 120, 120, 120)),  // gray
+            };
+        }
+        return new SolidColorBrush(Colors.Gray);
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}

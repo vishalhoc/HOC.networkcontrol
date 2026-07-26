@@ -51,7 +51,17 @@
                     </StackPanel>
                 </ToggleButton>
 
-                <!-- Windows Network Tools flyout -->
+                <!-- Force Refresh -->
+                <Button x:Name="ForceRefreshButton" Padding="8,6"
+                        Click="OnForceRefresh"
+                        Style="{ThemeResource AccentButtonStyle}"
+                        ToolTipService.ToolTip="Force an immediate refresh of the connection list">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+                        <TextBlock Text="Refresh Now" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+
                 <Button Padding="8,6" ToolTipService.ToolTip="Windows Network Tools">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <FontIcon Glyph="&#xE774;" FontSize="14"/>
@@ -272,8 +282,14 @@
                     <TextBlock Text="{x:Bind ViewModel.GlobalTotalText, Mode=OneWay}" VerticalAlignment="Center" FontSize="12"/>
                 </StackPanel>
 
-                <!-- Spacer -->
-                <Rectangle Grid.Column="3"/>
+                <!-- Live "Updated X ago" indicator (replaces inert spacer) -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4"
+                            VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <FontIcon Glyph="&#xE72C;" FontSize="11" Opacity="0.45"/>
+                    <TextBlock Text="{x:Bind ViewModel.LastRefreshedText, Mode=OneWay}"
+                               VerticalAlignment="Center" Foreground="Gray" FontSize="11" Opacity="0.8"/>
+                </StackPanel>
+
 
                 <!-- Session time -->
                 <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="5" Margin="0,0,16,0">
@@ -356,8 +372,8 @@
             <!-- Column headers -->
             <Grid Grid.Row="0" Margin="40,2,4,2" Padding="0,2" ColumnSpacing="6">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="30"/>
-                    <ColumnDefinition Width="160"/>
+                    <ColumnDefinition Width="26"/>
+                    <ColumnDefinition Width="170"/>
                     <ColumnDefinition Width="80"/>
                     <ColumnDefinition Width="90"/>
                     <ColumnDefinition Width="100"/>
@@ -369,6 +385,7 @@
                     <ColumnDefinition Width="40"/>
                     <ColumnDefinition Width="60"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="100"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0"  Text="☑"           FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1"  Text="Application ↕" Tag="Name (A-Z)"
@@ -390,16 +407,29 @@
                 <TextBlock Grid.Column="9"  Text="Blk In/Out"   FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="10" Text="Pin"          FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="11" Text="HTTP"         FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="12" Text="Block All"    FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="12" Text="Block"        FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="13" Text="VT Score"     FontWeight="SemiBold" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
             </Grid>
+
 
             <!-- Process list -->
             <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.FilteredProcesses, Mode=OneWay}"
-                      SelectionMode="None">
+                      SelectionMode="None"
+                      IsTabStop="False"
+                      ScrollViewer.BringIntoViewOnFocusChange="False">
+
+                <!-- Disable default slide/fade animations on Insert/Move/Remove.
+                     Without this, every collection update plays a transition which
+                     causes visible flicker when items reorder every 1.5 seconds. -->
+                <ListView.ItemContainerTransitions>
+                    <TransitionCollection/>
+                </ListView.ItemContainerTransitions>
+
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="Padding" Value="0,1"/>
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="IsTabStop" Value="False"/>
                     </Style>
                 </ListView.ItemContainerStyle>
 
@@ -422,7 +452,9 @@
                                         <ColumnDefinition Width="40"/>
                                         <ColumnDefinition Width="60"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="100"/>
                                     </Grid.ColumnDefinitions>
+
 
                                     <!-- Bulk select checkbox -->
                                     <ToggleButton Grid.Column="0"
@@ -451,22 +483,27 @@
                                                        TextTrimming="CharacterEllipsis" MaxWidth="110"/>
                                             <TextBlock Text="{Binding ConnectionStatsText}" FontSize="10" Foreground="Gray"/>
                                         </StackPanel>
-                                        <TextBlock Text="⚠" FontSize="11" VerticalAlignment="Center"
+                                        <TextBlock Text="⚠" FontSize="10" VerticalAlignment="Center"
                                                    Foreground="#FBBC05" ToolTipService.ToolTip="Suspicious process"
                                                    Visibility="{Binding IsSuspicious, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <Border Visibility="{Binding IsPhantom, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Background="#CC3300" CornerRadius="4" Padding="4,1">
-                                            <TextBlock Text="OFFLINE" FontSize="9" Foreground="White" FontWeight="Bold"/>
+                                                Background="#CC3300" CornerRadius="3" Padding="3,0">
+                                            <TextBlock Text="OFFLINE" FontSize="8" Foreground="White" FontWeight="Bold"/>
+                                        </Border>
+                                        <!-- NEW badge -->
+                                        <Border Visibility="{Binding IsNewlyDiscovered, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                Background="#107C10" CornerRadius="3" Padding="3,0">
+                                            <TextBlock Text="NEW" FontSize="8" Foreground="White" FontWeight="Bold"/>
                                         </Border>
                                         <Border Visibility="{Binding IsDataLimitExceeded, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Background="#8B0000" CornerRadius="4" Padding="4,1">
-                                            <TextBlock Text="LIMIT" FontSize="9" Foreground="White" FontWeight="Bold"/>
+                                                Background="#8B0000" CornerRadius="3" Padding="3,0">
+                                            <TextBlock Text="LIMIT" FontSize="8" Foreground="White" FontWeight="Bold"/>
                                         </Border>
                                         <Border Visibility="{Binding DataUsageTier, Converter={StaticResource DataUsageTierToVisibilityConverter}}"
                                                 Background="{Binding DataUsageTier, Converter={StaticResource DataUsageTierToBrushConverter}}"
-                                                CornerRadius="4" Padding="4,1">
+                                                CornerRadius="3" Padding="3,0">
                                             <TextBlock Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
-                                                       FontSize="9" Foreground="White" FontWeight="Bold"/>
+                                                       FontSize="8" Foreground="White" FontWeight="Bold"/>
                                         </Border>
                                     </StackPanel>
 
@@ -551,7 +588,17 @@
                                     <ToggleSwitch Grid.Column="12" OffContent="" OnContent=""
                                                   IsOn="{Binding IsBlocked, Mode=TwoWay}"
                                                   Toggled="OnBlockToggled" VerticalAlignment="Center"/>
+
+                                    <!-- VirusTotal badge button -->
+                                    <Button Grid.Column="13" Click="OnCheckVirusTotal"
+                                            VerticalAlignment="Center" HorizontalAlignment="Left"
+                                            Padding="4,2" CornerRadius="3" MinWidth="0"
+                                            ToolTipService.ToolTip="{Binding VtTooltip}">
+                                        <TextBlock Text="{Binding VtBadgeText}" FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{Binding VtStatus, Converter={StaticResource VtStatusToForegroundConverter}}"/>
+                                    </Button>
                                 </Grid>
+
                             </Expander.Header>
 
                             <!-- Right-click context menu -->

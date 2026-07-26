@@ -36,6 +36,7 @@ public sealed partial class HashcatPage : Page
     private CancellationTokenSource? _cts;
     private readonly object        _lock = new();
     private int                    _crackedCount;
+    private bool                   _nvidiaFound;   // set when NVIDIA GPU detected via -I
 
     // ── HTTP client (shared, lazy to avoid static-init crash) ─────────────────
     private static HttpClient? _httpBacking;
@@ -73,6 +74,7 @@ public sealed partial class HashcatPage : Page
         AttackModeCombo.SelectionChanged  += OnAttackModeChanged;
         MaskPresetCombo.SelectionChanged  += OnMaskPresetChanged;
         WorkloadSlider.ValueChanged        += OnWorkloadChanged;
+        DeviceCombo.SelectionChanged      += OnDeviceComboChanged;
 
         InitPage();
     }
@@ -273,30 +275,27 @@ public sealed partial class HashcatPage : Page
 
             // Extract
             AppendLine("[→] Extracting…");
+            bool extracted;
             if (fileName.EndsWith(".7z", StringComparison.OrdinalIgnoreCase))
             {
-                // Use 7z if available, otherwise prompt
-                await Extract7z(localZip);
+                extracted = await Extract7z(localZip);
             }
             else
             {
-                await Task.Run(() =>
-                {
-                    using var zip = ZipFile.OpenRead(localZip);
-                    foreach (var entry in zip.Entries)
-                    {
-                        string dest = Path.Combine(AppDataDir,
-                            entry.FullName.Contains('/') || entry.FullName.Contains('\\')
-                                ? Path.GetFileName(entry.FullName)
-                                : entry.FullName);
-                        if (string.IsNullOrEmpty(entry.Name)) continue; // skip dirs
-                        entry.ExtractToFile(dest, overwrite: true);
-                    }
-                });
+                extracted = await ExtractZip(localZip);
             }
 
-            // Cleanup
-            File.Delete(localZip);
+            if (!extracted || !HashcatInstalled)
+            {
+                AppendLine($"[ERROR] Extraction failed. Archive saved at: {localZip}");
+                AppendLine($"[HINT]  Extract hashcat.exe manually to: {AppDataDir}");
+                AppendLine("[HINT]  Install 7-Zip from https://7-zip.org then retry.");
+                SetStatus("Extraction failed", ok: false);
+                return;
+            }
+
+            // Cleanup archive only after confirmed success
+            try { File.Delete(localZip); } catch { }
             AppendLine($"[✓] Hashcat installed to: {AppDataDir}");
 
             DispatcherQueue?.TryEnqueue(() =>
@@ -329,18 +328,62 @@ public sealed partial class HashcatPage : Page
         }
     }
 
-    private async Task Extract7z(string path)
+    // ── Extraction helpers ────────────────────────────────────────────────────
+
+    /// <summary>Extracts a .7z archive, auto-downloading 7zr.exe if 7-Zip is not installed.
+    /// Returns true only when hashcat.exe is present after extraction.</summary>
+    private async Task<bool> Extract7z(string archivePath)
     {
-        // Try system 7z first
+        // 1. Try system 7-Zip
         string[] sevenZipPaths = [
             @"C:\Program Files\7-Zip\7z.exe",
             @"C:\Program Files (x86)\7-Zip\7z.exe"
         ];
         string? sevenZip = sevenZipPaths.FirstOrDefault(File.Exists);
 
-        if (sevenZip != null)
+        // 2. Auto-download the tiny standalone 7zr.exe (~500 KB) if needed
+        if (sevenZip == null)
         {
-            var psi = new ProcessStartInfo(sevenZip, $"x \"{path}\" -o\"{AppDataDir}\" -y")
+            string sevenZrPath = Path.Combine(Path.GetTempPath(), "7zr.exe");
+            if (!File.Exists(sevenZrPath))
+            {
+                AppendLine("[→] 7-Zip not installed. Downloading 7zr.exe (standalone extractor, ~500 KB)…");
+                try
+                {
+                    using var resp = await Http.GetAsync("https://www.7-zip.org/a/7zr.exe");
+                    resp.EnsureSuccessStatusCode();
+                    await using var fs = new FileStream(sevenZrPath, FileMode.Create, FileAccess.Write);
+                    await resp.Content.CopyToAsync(fs);
+                    AppendLine("[✓] 7zr.exe downloaded.");
+                }
+                catch (Exception ex)
+                {
+                    AppendLine($"[WARN] Could not download 7zr.exe: {ex.Message}");
+                }
+            }
+            else
+            {
+                AppendLine("[→] Using cached 7zr.exe for extraction.");
+            }
+
+            if (File.Exists(sevenZrPath))
+                sevenZip = sevenZrPath;
+        }
+
+        if (sevenZip == null)
+        {
+            AppendLine($"[WARN] No extractor available. Archive kept at: {archivePath}");
+            AppendLine("[HINT] Install 7-Zip from https://7-zip.org then retry.");
+            return false;
+        }
+
+        // 3. Extract to a temp directory so we can handle the nested hashcat-x.y.z/ folder
+        string tempDir = Path.Combine(Path.GetTempPath(), "hashcat_extract_" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            AppendLine($"[→] Extracting with {Path.GetFileName(sevenZip)}…");
+            var psi = new ProcessStartInfo(sevenZip, $"x \"{archivePath}\" -o\"{tempDir}\" -y")
             {
                 UseShellExecute        = false,
                 RedirectStandardOutput = true,
@@ -348,14 +391,91 @@ public sealed partial class HashcatPage : Page
                 CreateNoWindow         = true
             };
             using var p = Process.Start(psi)!;
+            string stdout = await p.StandardOutput.ReadToEndAsync();
+            string stderr = await p.StandardError.ReadToEndAsync();
             await p.WaitForExitAsync();
+
+            if (p.ExitCode != 0)
+            {
+                AppendLine($"[WARN] Extractor exited with code {p.ExitCode}.");
+                if (!string.IsNullOrWhiteSpace(stderr)) AppendLine($"[stderr] {stderr.Trim()}");
+                return false;
+            }
+
+            // 4. Hashcat archives contain a hashcat-x.y.z/ subdirectory — find and flatten it
+            string sourceDir = tempDir;
+            if (!File.Exists(Path.Combine(tempDir, "hashcat.exe")))
+            {
+                var sub = Directory.GetDirectories(tempDir, "hashcat*", SearchOption.TopDirectoryOnly)
+                                   .FirstOrDefault();
+                if (sub != null) sourceDir = sub;
+            }
+
+            AppendLine("[→] Installing hashcat files…");
+            await Task.Run(() => CopyDirectory(sourceDir, AppDataDir));
+
+            if (HashcatInstalled)
+            {
+                AppendLine("[✓] Extraction complete.");
+                return true;
+            }
+
+            AppendLine("[WARN] hashcat.exe not found after extraction — archive structure may have changed.");
+            return false;
         }
-        else
+        finally
         {
-            AppendLine("[WARN] 7-Zip not found. Please extract manually.");
-            AppendLine($"[HINT]  Extract {path} to: {AppDataDir}");
-            AppendLine("[HINT]  Or install 7-Zip from https://7-zip.org");
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
+    }
+
+    /// <summary>Extracts a .zip archive preserving subdirectories. Returns true when hashcat.exe exists.</summary>
+    private async Task<bool> ExtractZip(string archivePath)
+    {
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var zip = ZipFile.OpenRead(archivePath);
+                // Determine common root prefix (hashcat-x.y.z/) if present
+                string? prefix = null;
+                if (zip.Entries.Count > 0)
+                {
+                    var firstDir = zip.Entries[0].FullName.Split('/')[0];
+                    if (zip.Entries.All(e => e.FullName.StartsWith(firstDir + "/", StringComparison.OrdinalIgnoreCase)))
+                        prefix = firstDir + "/";
+                }
+
+                foreach (var entry in zip.Entries)
+                {
+                    string relativePath = prefix != null && entry.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                        ? entry.FullName[prefix.Length..]
+                        : entry.FullName;
+
+                    if (string.IsNullOrEmpty(relativePath) || relativePath.EndsWith('/')) continue;
+
+                    string dest = Path.Combine(AppDataDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                    entry.ExtractToFile(dest, overwrite: true);
+                }
+            });
+            return HashcatInstalled;
+        }
+        catch (Exception ex)
+        {
+            AppendLine($"[WARN] Zip extraction error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>Recursively copies a directory tree.</summary>
+    private static void CopyDirectory(string source, string dest)
+    {
+        Directory.CreateDirectory(dest);
+        foreach (var file in Directory.GetFiles(source))
+            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)), overwrite: true);
+        foreach (var dir in Directory.GetDirectories(source))
+            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
     }
 
     // ── File pickers ──────────────────────────────────────────────────────────
@@ -565,7 +685,8 @@ public sealed partial class HashcatPage : Page
         // Build hashcat arguments
         string hashType = ((ComboBoxItem?)HashTypeCombo.SelectedItem)?.Tag?.ToString() ?? "22000";
         string attack   = ((ComboBoxItem?)AttackModeCombo.SelectedItem)?.Tag?.ToString() ?? "0";
-        string device   = ((ComboBoxItem?)DeviceCombo.SelectedItem)?.Tag?.ToString() ?? "";
+        string deviceTag = ((ComboBoxItem?)DeviceCombo.SelectedItem)?.Tag?.ToString() ?? "";
+        string device    = deviceTag == "custom" ? CustomDeviceBox.Text.Trim() : deviceTag;
         int    workload = (int)WorkloadSlider.Value;
 
         string rules = RulesBox.Text.Trim();
@@ -689,21 +810,68 @@ public sealed partial class HashcatPage : Page
     private async void OnCheckGpu(object sender, RoutedEventArgs e)
     {
         if (!HashcatInstalled) { AppendLine("[ERROR] Hashcat not installed."); return; }
+        _nvidiaFound = false;
         ClearOutput();
         await RunHashcatAsync("-I", "Detecting GPU devices…",
                               onOutput: line => ParseGpuInfo(line));
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            if (!_nvidiaFound)
+                DeviceHintText.Text = "No NVIDIA GPU found — using Auto mode.";
+        });
+    }
+
+    private async void OnRefreshDevices(object sender, RoutedEventArgs e)
+    {
+        if (!HashcatInstalled) { AppendLine("[ERROR] Hashcat not installed."); return; }
+        _nvidiaFound = false;
+        DispatcherQueue?.TryEnqueue(() => DeviceHintText.Text = "Detecting devices…");
+        await RunHashcatAsync("-I", "Detecting GPU devices…", silent: true,
+                              onOutput: line => ParseGpuInfo(line));
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            if (!_nvidiaFound)
+                DeviceHintText.Text = "No NVIDIA GPU found — try 'GPU Info' for details.";
+        });
     }
 
     private void ParseGpuInfo(string line)
     {
-        if (line.Contains("Device #") || line.Contains("Type") || line.Contains("Name"))
+        // Detect NVIDIA GPU — check for NVIDIA brand keywords in the hashcat -I output
+        bool isNvidiaLine = line.Contains("NVIDIA") || line.Contains("GeForce")
+                         || line.Contains(" RTX ") || line.Contains(" GTX ")
+                         || line.Contains("Quadro") || line.Contains("Tesla")
+                         || line.Contains("CUDA");
+
+        if (isNvidiaLine)
         {
+            // Extract name from lines like "  Name...........: NVIDIA GeForce RTX 3060"
+            string gpuName = line.Contains(":")
+                ? (line.Split(':').LastOrDefault()?.Trim().TrimStart('.') ?? "NVIDIA GPU")
+                : line.Trim();
+            if (string.IsNullOrWhiteSpace(gpuName)) gpuName = "NVIDIA GPU";
+
             DispatcherQueue?.TryEnqueue(() =>
             {
                 GpuBadge.Visibility = Visibility.Visible;
-                if (line.Contains("Name"))
-                    GpuBadgeText.Text = line.Split(':').LastOrDefault()?.Trim() ?? "GPU Ready";
+                GpuBadgeText.Text   = gpuName;
+                if (!_nvidiaFound)
+                {
+                    _nvidiaFound = true;
+                    DeviceCombo.SelectedIndex = 1;   // "NVIDIA CUDA only"
+                    DeviceHintText.Text = "✓ NVIDIA GPU detected — CUDA mode selected";
+                }
             });
+        }
+        else if (line.Contains("Device #") || line.Contains("Backend Device"))
+        {
+            DispatcherQueue?.TryEnqueue(() => GpuBadge.Visibility = Visibility.Visible);
+        }
+        else if (line.Contains("Name") && line.Contains(":") && !_nvidiaFound)
+        {
+            string name = line.Split(':').LastOrDefault()?.Trim().TrimStart('.') ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(name))
+                DispatcherQueue?.TryEnqueue(() => GpuBadgeText.Text = name);
         }
     }
 
@@ -856,6 +1024,138 @@ public sealed partial class HashcatPage : Page
             ? Visibility.Visible : Visibility.Collapsed;
         UpdateCommandPreview();
     }
+    private void OnDeviceComboChanged(object s, SelectionChangedEventArgs e)
+    {
+        string tag = ((ComboBoxItem?)DeviceCombo.SelectedItem)?.Tag?.ToString() ?? "";
+        if (CustomDeviceBox != null)
+            CustomDeviceBox.Visibility = tag == "custom" ? Visibility.Visible : Visibility.Collapsed;
+        UpdateCommandPreview();
+    }
+    private void OnGoToWifiPentest(object sender, RoutedEventArgs e)
+    {
+        if (App.Window is MainWindow mw)
+            mw.NavigateTo("WifiPentest");
+    }
+
+    // ── Target WiFi Network Scanner ────────────────────────────────────────────
+
+    private readonly System.Collections.ObjectModel.ObservableCollection<WifiNetwork>
+        _hcNetworks = new();
+
+    private async void OnScanNetworksForHashcat(object sender, RoutedEventArgs e)
+    {
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            HcNetworkListPanel.Visibility  = Visibility.Visible;
+            HcNetworkList.ItemsSource      = _hcNetworks;
+            HcNetworkScanStatus.Text       = "Scanning…";
+            _hcNetworks.Clear();
+        });
+
+        string raw = await Task.Run(() =>
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo(
+                    "netsh", "wlan show networks mode=bssid")
+                {
+                    UseShellExecute        = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow         = true
+                };
+                using var p = System.Diagnostics.Process.Start(psi)!;
+                string o = p.StandardOutput.ReadToEnd();
+                p.WaitForExit();
+                return o;
+            }
+            catch { return ""; }
+        });
+
+        var networks = ParseNetshNetworks(raw);
+
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            _hcNetworks.Clear();
+            foreach (var n in networks) _hcNetworks.Add(n);
+            HcNetworkScanStatus.Text = networks.Count > 0
+                ? $"{networks.Count} networks found"
+                : "No networks found — ensure Wi-Fi is on";
+        });
+    }
+
+    private static List<WifiNetwork> ParseNetshNetworks(string raw)
+    {
+        var result = new List<WifiNetwork>();
+        if (string.IsNullOrWhiteSpace(raw)) return result;
+
+        var blocks = System.Text.RegularExpressions.Regex
+            .Split(raw, @"SSID\s+\d+\s*:",
+                   System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            .Where(b => b.Trim().Length > 0).ToList();
+
+        foreach (var block in blocks)
+        {
+            string Get(string key) =>
+                System.Text.RegularExpressions.Regex
+                    .Match(block,
+                        $@"{System.Text.RegularExpressions.Regex.Escape(key)}\s*:\s*(.+)",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                    .Groups[1].Value.Trim();
+
+            string ssid    = block.Split('\n').First().Trim();
+            string bssid   = Get("BSSID 1");
+            string signal  = Get("Signal");
+            string auth    = Get("Authentication");
+            string channel = Get("Channel");
+            string band    = Get("Band");
+
+            if (string.IsNullOrWhiteSpace(bssid)) bssid = Get("BSSID");
+
+            int signalPct = 0;
+            if (int.TryParse(
+                System.Text.RegularExpressions.Regex.Match(signal, @"\d+").Value,
+                out int sp)) signalPct = sp;
+
+            if (ssid.Length == 0 && bssid.Length == 0) continue;
+
+            result.Add(new WifiNetwork
+            {
+                Ssid      = ssid.Length  > 0 ? ssid  : "<hidden>",
+                Bssid     = bssid,
+                Signal    = $"{signalPct}%",
+                Auth      = auth,
+                Band      = band,
+                Channel   = channel,
+                SignalPct = signalPct
+            });
+        }
+
+        return result.OrderByDescending(n => n.SignalPct).ToList();
+    }
+
+    private void OnSelectHashcatTarget(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not WifiNetwork network) return;
+
+        // Fill session name with SSID (used as potfile/output name)
+        if (SessionBox != null)
+            SessionBox.Text = network.Ssid;
+
+        // Show selected target info
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            HcTargetInfo.Visibility  = Visibility.Visible;
+            HcTargetText.Text        = $"{network.Ssid}  ·  {network.Bssid}  ·  {network.Signal}  ·  {network.Auth}";
+            HcTargetBadge.Visibility = Visibility.Visible;
+            HcTargetBadgeText.Text   = network.Ssid;
+        });
+
+        AppendLine($"[→] Target network selected: {network.Ssid} ({network.Bssid})");
+        AppendLine($"[INFO] Session name set to: {network.Ssid}");
+        AppendLine($"[HINT] Load the .hc22000 capture file from 'Hash / Capture File' above.");
+        UpdateCommandPreview();
+    }
+
     private void OnWorkloadChanged(object s,
         Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {

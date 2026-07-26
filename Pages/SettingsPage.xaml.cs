@@ -109,8 +109,13 @@ public sealed partial class SettingsPage : Page
         // Check if Npcap driver is installed
         CheckNpcapStatus();
 
+        // API keys
+        if (VtApiKeyBox != null)
+            VtApiKeyBox.Password = _cfg?.VirusTotalApiKey ?? string.Empty;
+
         _loaded = true;
     }
+
 
     // ── Appearance ────────────────────────────────────────────────────────────
     private void OnThemeChanged(object sender, SelectionChangedEventArgs e)
@@ -631,6 +636,26 @@ public sealed partial class SettingsPage : Page
     {
         if (_cfg == null) return;
         _vm?.SaveConfig();
-        SaveStatus.Text = $"✓ Settings saved — {DateTime.Now:HH:mm:ss}";
+        SaveStatus.Text = $"\u2713 Settings saved — {DateTime.Now:HH:mm:ss}";
+    }
+
+    // ── VirusTotal API Key ─────────────────────────────────────────────────────
+    private void OnVtApiKeyLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_cfg == null || _vm == null) return;
+        string key = VtApiKeyBox?.Password?.Trim() ?? string.Empty;
+        _cfg.VirusTotalApiKey = key;
+        _vm.VtApiKey          = key; // update live ViewModel
+        _vm.SaveConfig();
+    }
+
+    private void OnOpenVtSite(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                "https://www.virustotal.com/gui/my-apikey") { UseShellExecute = true });
+        }
+        catch { }
     }
 }

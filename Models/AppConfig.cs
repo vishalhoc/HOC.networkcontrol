@@ -73,4 +73,7 @@ public class AppConfig
 
     // Per-app user notes (#11)
     public Dictionary<string, string> AppNotes { get; set; } = new();
+
+    // VirusTotal API key (free API from https://www.virustotal.com/gui/my-apikey)
+    public string VirusTotalApiKey { get; set; } = string.Empty;
 }

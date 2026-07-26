@@ -121,11 +121,48 @@ public partial class ProcessNetworkInfo : ObservableObject
         _              => "Not Blocked"
     };
 
+    // Dead-band: only fire PropertyChanged when speed changes by more than this threshold.
+    // Prevents per-row re-renders for tiny fluctuations (e.g. 1.2 → 1.3 KB/s).
+    private const double SpeedDeadBandKbps = 2.0;
+
     private double _uploadSpeed;
-    public  double UploadSpeed   { get => _uploadSpeed;   set { if (SetProperty(ref _uploadSpeed, System.Math.Round(value, 1))) OnPropertyChanged(nameof(UploadSpeedRatio)); } }
+    public  double UploadSpeed
+    {
+        get => _uploadSpeed;
+        set
+        {
+            double rounded = System.Math.Round(value, 1);
+            if (System.Math.Abs(rounded - _uploadSpeed) >= SpeedDeadBandKbps || (rounded == 0 && _uploadSpeed != 0))
+            {
+                if (SetProperty(ref _uploadSpeed, rounded))
+                    OnPropertyChanged(nameof(UploadSpeedRatio));
+            }
+            else
+            {
+                _uploadSpeed = rounded; // update backing field silently (keeps sorting accurate)
+            }
+        }
+    }
 
     private double _downloadSpeed;
-    public  double DownloadSpeed { get => _downloadSpeed; set { if (SetProperty(ref _downloadSpeed, System.Math.Round(value, 1))) OnPropertyChanged(nameof(DownloadSpeedRatio)); } }
+    public  double DownloadSpeed
+    {
+        get => _downloadSpeed;
+        set
+        {
+            double rounded = System.Math.Round(value, 1);
+            if (System.Math.Abs(rounded - _downloadSpeed) >= SpeedDeadBandKbps || (rounded == 0 && _downloadSpeed != 0))
+            {
+                if (SetProperty(ref _downloadSpeed, rounded))
+                    OnPropertyChanged(nameof(DownloadSpeedRatio));
+            }
+            else
+            {
+                _downloadSpeed = rounded;
+            }
+        }
+    }
+
 
     private long _totalDataUsed;
     public  long TotalDataUsed
@@ -133,10 +170,28 @@ public partial class ProcessNetworkInfo : ObservableObject
         get => _totalDataUsed;
         set
         {
-            if (SetProperty(ref _totalDataUsed, value))
+            // Only notify when tier changes OR value crosses a 4 KB display threshold.
+            // Byte-level changes fire thousands of notifications per minute — all invisible.
+            bool tierWillChange = DataUsageTierFor(value) != DataUsageTierFor(_totalDataUsed);
+            bool thresholdCrossed = System.Math.Abs(value - _totalDataUsed) >= 4096;
+            _totalDataUsed = value;
+            if (tierWillChange)
+            {
+                OnPropertyChanged(nameof(TotalDataUsed));
                 OnPropertyChanged(nameof(DataUsageTier));
+            }
+            else if (thresholdCrossed)
+            {
+                OnPropertyChanged(nameof(TotalDataUsed));
+            }
         }
     }
+
+    private static int DataUsageTierFor(long bytes) =>
+        bytes < 1024L * 1024 * 10   ? 0 :
+        bytes < 1024L * 1024 * 100  ? 1 :
+        bytes < 1024L * 1024 * 1024 ? 2 : 3;
+
 
     // Speed ratios relative to the global max — set externally by ViewModel each update cycle
     private double _maxUploadKbps  = 1;
@@ -180,7 +235,15 @@ public partial class ProcessNetworkInfo : ObservableObject
     public int ConnectionCount => Connections.Count;
     public int BlockedConnectionCount => System.Linq.Enumerable.Count(Connections, c => c.IsBlocked);
     public string ConnectionStatsText => $"{ConnectionCount} sockets ({BlockedConnectionCount} blocked)";
-    public void RefreshConnectionStats() => OnPropertyChanged(nameof(ConnectionStatsText));
+
+    /// <summary>Refreshes all connection-derived computed properties.</summary>
+    public void RefreshConnectionStats()
+    {
+        OnPropertyChanged(nameof(ConnectionCount));
+        OnPropertyChanged(nameof(BlockedConnectionCount));
+        OnPropertyChanged(nameof(ConnectionStatsText));
+    }
+
 
     // ── Launch Count and Parent Process (#31, #32) ───────────────────────────
     private int _launchCount = 1;
@@ -190,21 +253,42 @@ public partial class ProcessNetworkInfo : ObservableObject
     public string ParentProcessName { get => _parentProcessName; set => SetProperty(ref _parentProcessName, value); }
 
     // ── Sparkline history (#13) ───────────────────────────────────────────────
-    // Rolling 30-point window of combined (upload+download) KB/s readings
+    // Rolling 30-point window of combined (upload+download) KB/s readings.
+    // Stored as a ring buffer; _speedHistoryIdx points to the NEXT write slot.
     private readonly double[] _speedHistory = new double[30];
     private int _speedHistoryIdx;
-    public System.Collections.Generic.IReadOnlyList<double> SpeedHistory => _speedHistory;
+
+    /// <summary>
+    /// Returns the 30 speed samples in chronological order (oldest first).
+    /// Returns a NEW array copy every call so the SparklineControl DependencyProperty
+    /// always sees a reference change and triggers a canvas redraw.
+    /// </summary>
+    public IReadOnlyList<double> SpeedHistory
+    {
+        get
+        {
+            int n   = _speedHistory.Length;      // 30
+            var arr = new double[n];
+            int start = _speedHistoryIdx % n;    // oldest slot
+            for (int i = 0; i < n; i++)
+                arr[i] = _speedHistory[(start + i) % n];
+            return arr;
+        }
+    }
 
     public void PushSpeedSample(double combinedKbps)
     {
         _speedHistory[_speedHistoryIdx % 30] = combinedKbps;
         _speedHistoryIdx++;
-        if (combinedKbps > 0)
-        {
-            LastActiveTime = System.DateTime.Now;
-        }
+        if (combinedKbps > 0) LastActiveTime = System.DateTime.Now;
+
+        // Always fire — SpeedHistory returns a new clone each read, so the
+        // SparklineControl DependencyProperty sees a reference change every tick
+        // and calls OnSamplesChanged → Redraw().
         OnPropertyChanged(nameof(SpeedHistory));
-        OnPropertyChanged(nameof(IsIdle));
+
+        bool wasIdle = IsIdle;
+        if (wasIdle != IsIdle) OnPropertyChanged(nameof(IsIdle));
     }
 
     private System.DateTime _lastActiveTime = System.DateTime.Now;
@@ -235,6 +319,65 @@ public partial class ProcessNetworkInfo : ObservableObject
     // ── Data limit in MB (#16) — 0 = no limit ────────────────────────────────
     private double _dataLimitMb;
     public  double DataLimitMb { get => _dataLimitMb; set => SetProperty(ref _dataLimitMb, value); }
+
+    // ── Newly-discovered badge ──────────────────────────────────────────────────
+    private bool _isNewlyDiscovered;
+    public  bool IsNewlyDiscovered { get => _isNewlyDiscovered; set => SetProperty(ref _isNewlyDiscovered, value); }
+    public DateTime DiscoveredAt { get; set; } = DateTime.MinValue;
+
+    // ── VirusTotal scan result ─────────────────────────────────────────────────
+    private Core.VtStatus _vtStatus = Core.VtStatus.Unknown;
+    public  Core.VtStatus VtStatus
+    {
+        get => _vtStatus;
+        set
+        {
+            if (SetProperty(ref _vtStatus, value))
+            {
+                OnPropertyChanged(nameof(VtBadgeText));
+                OnPropertyChanged(nameof(VtTooltip));
+            }
+        }
+    }
+
+    private string _vtScore = string.Empty;
+    public  string VtScore
+    {
+        get => _vtScore;
+        set
+        {
+            if (SetProperty(ref _vtScore, value))
+            {
+                OnPropertyChanged(nameof(VtBadgeText));
+                OnPropertyChanged(nameof(VtTooltip));
+            }
+        }
+    }
+
+    /// <summary>Short badge label shown in the process row (e.g. "✓ 0/72", "✗ 3/72", "VT?").</summary>
+    public string VtBadgeText => VtStatus switch
+    {
+        Core.VtStatus.Clean      => $"\u2713 {VtScore}",
+        Core.VtStatus.Suspicious => $"\u26A0 {VtScore}",
+        Core.VtStatus.Malicious  => $"\u2717 {VtScore}",
+        Core.VtStatus.NotFound   => "N/A",
+        Core.VtStatus.Checking   => "\u29D7",  // ⏷ hourglass
+        Core.VtStatus.Error      => "Err",
+        _                        => "VT?"
+    };
+
+    /// <summary>Rich tooltip shown when hovering the VT badge button.</summary>
+    public string VtTooltip => VtStatus switch
+    {
+        Core.VtStatus.Clean      => $"\u2705 Clean — {VtScore} engines flagged this file\nClick to re-scan",
+        Core.VtStatus.Suspicious => $"\u26A0\uFE0F Suspicious — {VtScore} detections\nClick to re-scan",
+        Core.VtStatus.Malicious  => $"\u274C Malicious — {VtScore} engines flagged this file as malware!\nClick to re-scan",
+        Core.VtStatus.NotFound   => "File not found in VirusTotal database.\nIt may be too new or very rare.\nClick to re-scan.",
+        Core.VtStatus.Checking   => "Scanning on VirusTotal…",
+        Core.VtStatus.Error      => $"Scan error: {VtScore}\nClick to retry.",
+        _                        => "Click to scan this file on VirusTotal.\nRequires an API key — add one in Settings \u2192 API Keys."
+    };
+
 
     public ProcessNetworkInfo()
     {

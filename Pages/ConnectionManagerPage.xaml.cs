@@ -90,7 +90,11 @@ public sealed partial class ConnectionManagerPage : Page
         });
     }
 
+    // ── Force Refresh ──────────────────────────────────────────────────────────
+    private void OnForceRefresh(object sender, RoutedEventArgs e) => ViewModel?.ForceRefresh();
+
     // ── DNS Flush ─────────────────────────────────────────────────────────────
+
     private async void OnFlushDnsClicked(object sender, RoutedEventArgs e)
     {
         var (ok, output) = await System.Threading.Tasks.Task.Run(
@@ -541,28 +545,8 @@ public sealed partial class ConnectionManagerPage : Page
     }
 
     // ── VirusTotal lookup ─────────────────────────────────────────────────────
-    private void OnCtxVirusTotal(object sender, RoutedEventArgs e)
-    {
-        if (_ctxProcess == null) return;
-        string path = _ctxProcess.ProcessPath ?? "";
-        if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
-        {
-            try
-            {
-                using var sha = System.Security.Cryptography.SHA256.Create();
-                using var fs  = System.IO.File.OpenRead(path);
-                byte[] hash   = sha.ComputeHash(fs);
-                string hex    = BitConverter.ToString(hash).Replace("-", "").ToLower();
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                    $"https://www.virustotal.com/gui/file/{hex}") { UseShellExecute = true });
-                return;
-            }
-            catch { }
-        }
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-            $"https://www.virustotal.com/gui/search/{Uri.EscapeDataString(_ctxProcess.ProcessName)}")
-            { UseShellExecute = true });
-    }
+    private async void OnCtxVirusTotal(object sender, RoutedEventArgs e)
+        => await RunVtScanAsync(_ctxProcess);
 
     // ── Ping selected process host ────────────────────────────────────────────
     private void OnCtxPingHost(object sender, RoutedEventArgs e)
@@ -790,5 +774,50 @@ public sealed partial class ConnectionManagerPage : Page
             }.ShowAsync();
         }
         catch { }
+    }
+
+    // ── VirusTotal ────────────────────────────────────────────────────────────
+
+    /// <summary>Inline VT badge button click — walks up FrameworkElement.DataContext chain.</summary>
+    private async void OnCheckVirusTotal(object sender, RoutedEventArgs e)
+    {
+        // DataContext on the Button inside a DataTemplate is the bound ProcessNetworkInfo
+        ProcessNetworkInfo? process = null;
+        if (sender is FrameworkElement fe && fe.DataContext is ProcessNetworkInfo info)
+            process = info;
+
+        await RunVtScanAsync(process);
+    }
+
+    private async System.Threading.Tasks.Task RunVtScanAsync(ProcessNetworkInfo? process)
+    {
+        if (process == null) return;
+
+        if (string.IsNullOrWhiteSpace(ViewModel.VtApiKey))
+        {
+            await new ContentDialog
+            {
+                Title   = "VirusTotal API Key Required",
+                Content = "Please add your free VirusTotal API key in Settings → API Keys → VirusTotal.\n\n" +
+                          "Get a free key at: https://www.virustotal.com/gui/my-apikey",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            }.ShowAsync();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(process.ProcessPath))
+        {
+            await new ContentDialog
+            {
+                Title   = "Cannot Scan",
+                Content = $"No file path available for '{process.ProcessName}'.\nSystem/protected processes cannot be scanned.",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            }.ShowAsync();
+            return;
+        }
+
+        await ViewModel.CheckVirusTotalAsync(process);
     }
 }

