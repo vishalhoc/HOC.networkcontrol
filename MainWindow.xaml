@@ -26,6 +26,7 @@
                       Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto" MinWidth="240"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
@@ -70,8 +71,20 @@
                         </Border>
                     </StackPanel>
 
+                    <!-- UX#21: Global search bar -->
+                    <AutoSuggestBox x:Name="GlobalSearchBox"
+                                    Grid.Column="1"
+                                    PlaceholderText="Search apps, rules, DNS…"
+                                    QueryIcon="Find"
+                                    Width="220"
+                                    VerticalAlignment="Center"
+                                    QuerySubmitted="OnGlobalSearchQuerySubmitted"
+                                    TextChanged="OnGlobalSearchTextChanged"
+                                    SuggestionChosen="OnGlobalSearchSuggestionChosen"
+                                    ToolTipService.ToolTip="Global search (Ctrl+F)"/>
+
                     <!-- Right: Global action buttons -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <ToggleButton IsChecked="{x:Bind ViewModel.BlockNewApps, Mode=TwoWay}"
                                       ToolTipService.ToolTip="Auto-block every newly detected process"
                                       Padding="8,5">
@@ -90,7 +103,87 @@
                             </StackPanel>
                         </ToggleButton>
 
-                        <Button Padding="8,5" Click="OnThemeToggleClicked" ToolTipService.ToolTip="Toggle theme">
+                        <!-- UX#12: Notification / alerts bell -->
+                        <Button x:Name="BellButton" Padding="8,5"
+                                Click="OnBellClicked"
+                                ToolTipService.ToolTip="Alerts &amp; notifications">
+                            <Grid>
+                                <FontIcon Glyph="&#xEA8F;" FontSize="15"/>
+                                <!-- Unread count badge -->
+                                <Border x:Name="BellBadge"
+                                        Visibility="Collapsed"
+                                        CornerRadius="8" MinWidth="16" Height="16"
+                                        Padding="3,0"
+                                        Background="{ThemeResource SystemFillColorCriticalBrush}"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Margin="8,-6,-6,0">
+                                    <TextBlock x:Name="BellBadgeText"
+                                               FontSize="9" FontWeight="Bold"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                            <Button.Flyout>
+                                <Flyout x:Name="AlertsFlyout" Placement="BottomEdgeAlignedRight">
+                                    <StackPanel Width="320" Spacing="0">
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Recent Alerts" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <Button Grid.Column="1" Content="Clear all" FontSize="11" Padding="6,3"
+                                                    Click="OnClearAlerts"
+                                                    Style="{StaticResource TransparentButtonStyle}"/>
+                                        </Grid>
+                                        <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
+                                            <ListView x:Name="AlertsFlyoutList"
+                                                      SelectionMode="None"
+                                                      IsItemClickEnabled="False">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Padding" Value="8,5"/>
+                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:AppAlert">
+                                                        <Grid ColumnSpacing="8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <FontIcon Glyph="{x:Bind IconGlyph}" FontSize="14"
+                                                                      Foreground="{x:Bind IconBrush}"
+                                                                      VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                                <TextBlock Text="{x:Bind Title}" FontSize="12" FontWeight="SemiBold"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock Text="{x:Bind Body}" FontSize="11" Foreground="Gray"
+                                                                           TextWrapping="Wrap"/>
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2" Text="{x:Bind TimeLabel}"
+                                                                       FontSize="10" Foreground="Gray"
+                                                                       VerticalAlignment="Top"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                        </ScrollViewer>
+                                        <TextBlock x:Name="AlertsEmptyLabel"
+                                                   Text="No recent alerts"
+                                                   FontSize="12" Foreground="Gray"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,12"
+                                                   Visibility="Visible"/>
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+
+                        <Button Padding="8,5" Click="OnThemeToggleClicked" ToolTipService.ToolTip="Toggle theme (Ctrl+Shift+T)">
                             <FontIcon x:Name="ThemeIcon" Glyph="&#xE708;" FontSize="15"/>
                         </Button>
 

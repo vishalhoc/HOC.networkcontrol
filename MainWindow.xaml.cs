@@ -6,6 +6,7 @@ using WinNetControl.Pages;
 using WinUIEx;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace WinNetControl;
@@ -30,6 +31,10 @@ public sealed partial class MainWindow : Window
     private readonly System.Threading.Timer _headerDebounce;
     private string _pendingUp   = string.Empty;
     private string _pendingDown = string.Empty;
+
+    // UX#12: alerts center
+    private readonly ObservableCollection<AppAlert> _alerts = new();
+    private int _unreadCount;
 
     public MainWindow()
     {
@@ -563,6 +568,12 @@ public sealed partial class MainWindow : Window
                 ShowShortcutHelp();
                 e.Handled = true;
                 break;
+
+            // UX#21: Ctrl+F — focus the global search box
+            case Windows.System.VirtualKey.F when ctrl:
+                GlobalSearchBox.Focus(FocusState.Keyboard);
+                e.Handled = true;
+                break;
         }
     }
 
@@ -585,6 +596,7 @@ public sealed partial class MainWindow : Window
             UI
             ──────────────────────────────
             Ctrl+Shift+T  Cycle theme (Dark / Light / System)
+            Ctrl+F        Focus global search
             F5            Refresh process list
             Ctrl+/  or F1 Show this help
             """;
@@ -609,5 +621,129 @@ public sealed partial class MainWindow : Window
         };
 
         try { await dialog.ShowAsync(); } catch { }
+    }
+
+    // ── UX#12: Notification / alerts center ─────────────────────────────────
+
+    /// <summary>
+    /// Public API: pages and services call this to surface a notification in the bell flyout.
+    /// Safe to call from any thread — marshals to UI thread internally.
+    /// </summary>
+    public void AddAlert(string title, string body, string iconGlyph = "\uE7BA", string color = "#F59E0B")
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            // Cap at 20 entries (oldest evicted first)
+            if (_alerts.Count >= 20) _alerts.RemoveAt(_alerts.Count - 1);
+            _alerts.Insert(0, new AppAlert
+            {
+                Title     = title,
+                Body      = body,
+                IconGlyph = iconGlyph,
+                Color     = color,
+                Timestamp = DateTime.Now
+            });
+
+            _unreadCount++;
+            BellBadgeText.Text      = _unreadCount > 99 ? "99+" : _unreadCount.ToString();
+            BellBadge.Visibility    = Visibility.Visible;
+            AlertsEmptyLabel.Visibility = Visibility.Collapsed;
+        });
+    }
+
+    private void OnBellClicked(object sender, RoutedEventArgs e)
+    {
+        // Bind list lazily (first open)
+        if (AlertsFlyoutList.ItemsSource == null)
+            AlertsFlyoutList.ItemsSource = _alerts;
+
+        // Clear unread badge when flyout is opened
+        _unreadCount            = 0;
+        BellBadge.Visibility    = Visibility.Collapsed;
+    }
+
+    private void OnClearAlerts(object sender, RoutedEventArgs e)
+    {
+        _alerts.Clear();
+        AlertsEmptyLabel.Visibility = Visibility.Visible;
+        _unreadCount = 0;
+        BellBadge.Visibility = Visibility.Collapsed;
+        AlertsFlyout.Hide();
+    }
+
+    // ── UX#21: Global search bar ─────────────────────────────────────────────
+
+    private void OnGlobalSearchTextChanged(AutoSuggestBox sender,
+                                           AutoSuggestBoxTextChangedEventArgs args)
+    {
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+        string q = sender.Text.Trim();
+        if (q.Length < 2) { sender.ItemsSource = null; return; }
+
+        // Suggest matching process names from the VM
+        var suggestions = ViewModel.Processes
+            .Where(p => p.ProcessName.Contains(q, StringComparison.OrdinalIgnoreCase))
+            .Select(p => p.ProcessName)
+            .Distinct()
+            .Take(8)
+            .ToList();
+
+        sender.ItemsSource = suggestions.Count > 0 ? suggestions : null;
+    }
+
+    private void OnGlobalSearchQuerySubmitted(AutoSuggestBox sender,
+                                              AutoSuggestBoxQuerySubmittedEventArgs args)
+    {
+        string q = (args.ChosenSuggestion as string ?? args.QueryText).Trim();
+        if (string.IsNullOrEmpty(q)) return;
+
+        // Apply filter and navigate to Connections
+        ViewModel.SearchText = q;
+        NavigateTo("Connections");
+        sender.Text = string.Empty;
+    }
+
+    private void OnGlobalSearchSuggestionChosen(AutoSuggestBox sender,
+                                                 AutoSuggestBoxSuggestionChosenEventArgs args)
+    {
+        sender.Text = args.SelectedItem?.ToString() ?? string.Empty;
+    }
+}
+
+// ── UX#12: Alert model ────────────────────────────────────────────────────────
+public sealed class AppAlert
+{
+    public string    Title     { get; init; } = string.Empty;
+    public string    Body      { get; init; } = string.Empty;
+    public string    IconGlyph { get; init; } = "\uE7BA";
+    public string    Color     { get; init; } = "#F59E0B";
+    public DateTime  Timestamp { get; init; } = DateTime.Now;
+
+    public Microsoft.UI.Xaml.Media.SolidColorBrush IconBrush
+    {
+        get
+        {
+            try
+            {
+                var c = Windows.UI.Color.FromArgb(0xFF,
+                    Convert.ToByte(Color[1..3], 16),
+                    Convert.ToByte(Color[3..5], 16),
+                    Convert.ToByte(Color[5..7], 16));
+                return new(c);
+            }
+            catch { return new(Microsoft.UI.Colors.Gray); }
+        }
+    }
+
+    public string TimeLabel
+    {
+        get
+        {
+            var ago = DateTime.Now - Timestamp;
+            if (ago.TotalSeconds < 60)  return $"{(int)ago.TotalSeconds}s ago";
+            if (ago.TotalMinutes < 60)  return $"{(int)ago.TotalMinutes}m ago";
+            if (ago.TotalHours   < 24)  return $"{(int)ago.TotalHours}h ago";
+            return Timestamp.ToString("MMM d");
+        }
     }
 }
