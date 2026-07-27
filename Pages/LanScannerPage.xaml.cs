@@ -438,6 +438,12 @@ public sealed partial class LanScannerPage : Page
                 ScanIcon.Glyph        = "\uE968";
                 ScanProgressBar.Value = 100;
                 ScanStatusText.Text   = $"Done — {_devices.Count} hosts in {_elapsed.Elapsed.TotalSeconds:F1}s";
+
+                // UX#12: push to notification center
+                App.MainWindow?.AddAlert(
+                    "LAN Scan Complete",
+                    $"Found {_devices.Count} host(s) in {_elapsed.Elapsed.TotalSeconds:F1}s.",
+                    "\uE968", "#10B981");
             });
         }
     }

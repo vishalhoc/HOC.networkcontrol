@@ -66,8 +66,8 @@
                 </ListView>
                 
                 <StackPanel Margin="0,32,0,0">
-                    <TextBlock Text="{x:Bind AppVersion, Mode=OneWay}" Foreground="Gray" FontSize="12"/>
-                    <TextBlock Text="{x:Bind BuildDate, Mode=OneWay}" Foreground="Gray" FontSize="12"/>
+                    <TextBlock Text="{x:Bind AppVersion, Mode=OneTime}" Foreground="Gray" FontSize="12"/>
+                    <TextBlock Text="{x:Bind BuildDate, Mode=OneTime}" Foreground="Gray" FontSize="12"/>
                 </StackPanel>
             </StackPanel>
         </Grid>

@@ -264,6 +264,10 @@ public sealed partial class FirewallPage : Page
         RuleStatus.Text = "Adding rule…";
         await RunElevatedAsync("netsh", args);
         RuleStatus.Text = $"Rule '{name}' added.";
+        App.MainWindow?.AddAlert(
+            "Firewall Rule Added",
+            $"Rule '{name}' (dir={dir}, block) added.",
+            "\uE7BA", "#0078D4");
         await LoadRulesAsync();
     }
 
@@ -289,11 +293,15 @@ public sealed partial class FirewallPage : Page
             return;
         }
 
-        RuleStatus.Text = $"Blocking {ip}…";
+        RuleStatus.Text = $"Blocking {ip}\u2026";
         await RunElevatedAsync("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=out action=block remoteip=\"{ip}\" enable=yes");
         // FIX Bug#11: clear the input AFTER the command succeeds, not before
         QuickBlockIpBox.Text = string.Empty;
         RuleStatus.Text = $"Outbound traffic to {ip} is blocked.";
+        App.MainWindow?.AddAlert(
+            "IP Blocked",
+            $"Outbound traffic to {ip} is now blocked.",
+            "\uF140", "#EF4444");
         await LoadRulesAsync();
     }
 

@@ -251,7 +251,21 @@ public sealed partial class ConnectionManagerPage : Page
 
             // UX#23: show undo toast only when BLOCKING (not unblocking)
             if (process.IsBlocked)
+            {
                 ShowUndoBlockToast(process);
+                // UX#12: persist in alerts center
+                App.MainWindow?.AddAlert(
+                    "App Blocked",
+                    $"{process.ProcessName} is now blocked from network access.",
+                    "\uF140", "#EF4444");
+            }
+            else
+            {
+                App.MainWindow?.AddAlert(
+                    "App Unblocked",
+                    $"{process.ProcessName} has been unblocked.",
+                    "\uE785", "#10B981");
+            }
         }
     }
 
@@ -452,6 +466,10 @@ public sealed partial class ConnectionManagerPage : Page
             ViewModel.ToggleBlock(p);
         }
         App.MainWindow?.ShowToast("Bulk Block", $"Blocked {targets.Count} process(es).", "success");
+        App.MainWindow?.AddAlert(
+            "Bulk Block",
+            $"{targets.Count} process(es) blocked from network access.",
+            "\uF140", "#EF4444");
     }
 
     private void OnBulkUnblock(object sender, RoutedEventArgs e)
@@ -464,6 +482,10 @@ public sealed partial class ConnectionManagerPage : Page
             ViewModel.ToggleBlock(p);
         }
         App.MainWindow?.ShowToast("Bulk Unblock", $"Unblocked {targets.Count} process(es).", "info");
+        App.MainWindow?.AddAlert(
+            "Bulk Unblock",
+            $"{targets.Count} process(es) restored network access.",
+            "\uE785", "#10B981");
     }
 
     // ── Process Right-Click Context Menu ─────────────────────────────────────

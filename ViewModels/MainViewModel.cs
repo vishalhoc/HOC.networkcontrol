@@ -1216,6 +1216,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             process.VtStatus = result.Status;
             process.VtScore  = displayScore;
+
+            // UX#12: push to alerts center for malicious/suspicious findings
+            if (result.Status == Core.VtStatus.Malicious)
+                App.MainWindow?.AddAlert(
+                    "⚠ Malware Detected",
+                    $"{process.ProcessName} — {displayScore}",
+                    "\uE814", "#EF4444");
+            else if (result.Status == Core.VtStatus.Suspicious)
+                App.MainWindow?.AddAlert(
+                    "Suspicious File",
+                    $"{process.ProcessName} flagged as suspicious by VirusTotal.",
+                    "\uE7BA", "#F59E0B");
         });
     }
 

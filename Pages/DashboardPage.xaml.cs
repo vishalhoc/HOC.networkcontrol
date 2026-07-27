@@ -174,6 +174,11 @@ public sealed partial class DashboardPage : Page
         {
             _alertedApps.Add(name);
             AddAlert($"Blocked: {name}", Microsoft.UI.Colors.IndianRed);
+            // UX#12: also push to global notification bell
+            App.MainWindow?.AddAlert(
+                "New Block Detected",
+                $"{name} is now blocked from network access.",
+                "\uF140", "#EF4444");
         }
     }
 
@@ -240,7 +245,15 @@ public sealed partial class DashboardPage : Page
         {
             InternetStatus.Text = isOnline ? "Connected" : "No Internet";
             StatusDot.Fill = new SolidColorBrush(isOnline ? Microsoft.UI.Colors.LimeGreen : Microsoft.UI.Colors.Red);
-            if (!isOnline) AddAlert("Internet connection lost!", Microsoft.UI.Colors.Red);
+            if (!isOnline)
+            {
+                AddAlert("Internet connection lost!", Microsoft.UI.Colors.Red);
+                // UX#12: global bell alert
+                App.MainWindow?.AddAlert(
+                    "Internet Lost",
+                    "No internet connectivity detected.",
+                    "\uE774", "#EF4444");
+            }
         });
 
         BuildHealthItems();
