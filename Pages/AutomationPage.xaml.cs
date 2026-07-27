@@ -163,7 +163,7 @@ public sealed partial class AutomationPage : Page
                 Log("  → DNS benchmark: navigating to DNS page...");
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (App.Window is MainWindow mw) mw.NavigateTo("Dns");
+                    if (App.MainWindow is MainWindow mw) mw.NavigateTo("Dns");
                 });
                 break;
 

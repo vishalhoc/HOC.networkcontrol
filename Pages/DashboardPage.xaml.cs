@@ -25,10 +25,13 @@ public sealed partial class DashboardPage : Page
 {
     public MainViewModel ViewModel { get; private set; } = null!;
 
-    // Timers
+    // Timers — readonly so they live for the page's lifetime
     private readonly DispatcherTimer _statsTimer  = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _pingTimer   = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _infoRefresh = new() { Interval = TimeSpan.FromSeconds(15) };
+
+    // Tracks whether the timer handlers are currently subscribed (prevents duplicate add)
+    private bool _timersSubscribed;
 
     // Ping state
     private bool _pingRunning;
@@ -38,6 +41,13 @@ public sealed partial class DashboardPage : Page
 
     // Alert list
     private readonly ObservableCollection<DashboardAlert> _alerts = new();
+    private readonly HashSet<string> _alertedApps = new();
+
+    // FIX Bug#5: Static shared HttpClient (no per-call socket exhaustion)
+    private static readonly System.Net.Http.HttpClient _httpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(5)
+    };
 
     public DashboardPage()
     {
@@ -54,9 +64,22 @@ public sealed partial class DashboardPage : Page
             TopAppsList.ItemsSource = ViewModel.TopConsumers;
         }
 
-        _statsTimer.Tick  += OnStatsTick;
-        _pingTimer.Tick   += OnPingTick;
-        _infoRefresh.Tick += async (_, __) => await LoadNetworkInfoAsync();
+        // FIX Bug#2 & #3: Use named methods and a subscription guard so repeated
+        // navigations never create duplicate timer subscriptions.
+        if (!_timersSubscribed)
+        {
+            _statsTimer.Tick  += OnStatsTick;
+            _pingTimer.Tick   += OnPingTick;
+            _infoRefresh.Tick += OnInfoRefreshTick;   // named — not a lambda
+            _timersSubscribed  = true;
+        }
+
+        // FIX Bug#4: Always reset peaks and ping state on every navigation
+        _peakUpload   = 0;
+        _peakDownload = 0;
+        _pingRunning  = false;
+        PingBtnText.Text = "Start";
+        _pingTimer.Stop();
 
         _statsTimer.Start();
         _infoRefresh.Start();
@@ -69,10 +92,28 @@ public sealed partial class DashboardPage : Page
     protected override void OnNavigatedFrom(NavigationEventArgs e)
     {
         base.OnNavigatedFrom(e);
+
+        // FIX Bug#2 & #3: Remove named handlers so they can be cleanly re-added
+        // next time. Use the same guard to ensure we don't double-remove.
+        if (_timersSubscribed)
+        {
+            _statsTimer.Tick  -= OnStatsTick;
+            _pingTimer.Tick   -= OnPingTick;
+            _infoRefresh.Tick -= OnInfoRefreshTick;
+            _timersSubscribed  = false;
+        }
+
         _statsTimer.Stop();
         _pingTimer.Stop();
         _infoRefresh.Stop();
+
+        // FIX Bug#4: reset ping state so Start/Stop button is consistent on return
+        _pingRunning = false;
     }
+
+    // Named info-refresh handler (replaces the lambda that could never be unsubscribed)
+    private async void OnInfoRefreshTick(object? sender, object e)
+        => await LoadNetworkInfoAsync();
 
     // ── Stats tick (every 1 s) ────────────────────────────────────────────────
     private void OnStatsTick(object? sender, object e)
@@ -83,9 +124,11 @@ public sealed partial class DashboardPage : Page
         CardUpload.Text   = ViewModel.GlobalUploadText;
         CardDownload.Text = ViewModel.GlobalDownloadText;
 
-        // Track peaks
-        double up   = ViewModel.Processes.Any() ? ViewModel.Processes.Max(p => p.UploadSpeed)   : 0;
-        double down = ViewModel.Processes.Any() ? ViewModel.Processes.Max(p => p.DownloadSpeed) : 0;
+        // FIX Bug#29: use safe Max with null/empty guard to prevent InvalidOperationException
+        var processes = ViewModel.Processes;
+        double up   = processes.Count > 0 ? processes.Max(p => p.UploadSpeed)   : 0;
+        double down = processes.Count > 0 ? processes.Max(p => p.DownloadSpeed) : 0;
+
         if (up   > _peakUpload)   _peakUpload   = up;
         if (down > _peakDownload) _peakDownload = down;
 
@@ -98,18 +141,18 @@ public sealed partial class DashboardPage : Page
         DownloadBar.Value = _peakDownload > 0 ? Math.Min(down / _peakDownload * 100, 100) : 0;
 
         // Blocked card
-        int blockedCount = ViewModel.Processes.Count(p => p.IsBlocked);
+        int blockedCount = processes.Count(p => p.IsBlocked);
         CardBlocked.Text    = $"{blockedCount} app{(blockedCount != 1 ? "s" : "")}";
         CardBlockedSub.Text = $"{blockedCount} blocked";
-        BlockedBar.Value    = ViewModel.Processes.Any()
-            ? (double)blockedCount / ViewModel.Processes.Count * 100 : 0;
+        BlockedBar.Value    = processes.Count > 0
+            ? (double)blockedCount / processes.Count * 100 : 0;
 
         // Active apps card
         int activeCount = ViewModel.FilteredProcesses.Count;
         CardApps.Text    = activeCount.ToString();
-        CardAppsSub.Text = $"of {ViewModel.Processes.Count} monitoring";
-        AppsBar.Value    = ViewModel.Processes.Any()
-            ? (double)activeCount / ViewModel.Processes.Count * 100 : 0;
+        CardAppsSub.Text = $"of {processes.Count} monitoring";
+        AppsBar.Value    = processes.Count > 0
+            ? (double)activeCount / processes.Count * 100 : 0;
 
         // Session stats
         SessionUptime.Text = ViewModel.SessionDuration;
@@ -117,7 +160,7 @@ public sealed partial class DashboardPage : Page
         TotalRecv.Text     = ViewModel.GlobalTotalReceivedText;
 
         // Check for blocked new apps (alert)
-        var newlyBlocked = ViewModel.Processes
+        var newlyBlocked = processes
             .Where(p => p.IsBlocked)
             .Select(p => p.ProcessName)
             .Except(_alertedApps)
@@ -128,8 +171,6 @@ public sealed partial class DashboardPage : Page
             AddAlert($"Blocked: {name}", Microsoft.UI.Colors.IndianRed);
         }
     }
-
-    private readonly HashSet<string> _alertedApps = new();
 
     // ── Network Info async load ───────────────────────────────────────────────
     private async Task LoadNetworkInfoAsync()
@@ -164,7 +205,7 @@ public sealed partial class DashboardPage : Page
                     mac     = string.Join(":", primary.GetPhysicalAddress().GetAddressBytes().Select(b => b.ToString("X2")));
                 }
 
-                // Wi-Fi signal (WMI-free: use netsh to find signal)
+                // Wi-Fi signal (netsh, no WMI)
                 string wifiSignal = GetWifiSignal();
                 string connUptime = GetConnectionUptime();
 
@@ -221,6 +262,7 @@ public sealed partial class DashboardPage : Page
     {
         try
         {
+            // FIX Bug#7: Report system uptime accurately with a clear label
             var uptime = TimeSpan.FromMilliseconds(System.Environment.TickCount64);
             return $"{(int)uptime.TotalHours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
         }
@@ -231,11 +273,10 @@ public sealed partial class DashboardPage : Page
     {
         try
         {
-            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            // Primary: api.ipify.org  Fallback: icanhazip.com
+            // FIX Bug#5: Use static shared _httpClient, not a new instance per call
             string ip;
-            try { ip = (await client.GetStringAsync("https://api.ipify.org")).Trim(); }
-            catch { ip = (await client.GetStringAsync("https://icanhazip.com")).Trim(); }
+            try { ip = (await _httpClient.GetStringAsync("https://api.ipify.org")).Trim(); }
+            catch { ip = (await _httpClient.GetStringAsync("https://icanhazip.com")).Trim(); }
             DispatcherQueue.TryEnqueue(() => InfoPublicIP.Text = ip);
         }
         catch { DispatcherQueue.TryEnqueue(() => InfoPublicIP.Text = "N/A"); }
@@ -426,12 +467,15 @@ public sealed partial class DashboardPage : Page
         }
     }
 
+    // FIX Bug#8: re-draw graph when canvas gets a valid size for the first time
+    private void OnPingCanvasSizeChanged(object sender, SizeChangedEventArgs e) => DrawPingGraph();
+
     // ── Quick Launch navigation ────────────────────────────────────────────────
     private void OnQuickNav(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is string tag)
         {
-            if (App.Window is MainWindow mw)
+            if (App.MainWindow is MainWindow mw)
                 mw.NavigateTo(tag);
         }
     }
@@ -439,7 +483,7 @@ public sealed partial class DashboardPage : Page
     // ── View All Apps → navigate to Connections ───────────────────────────────
     private void OnViewAllApps(object sender, RoutedEventArgs e)
     {
-        if (App.Window is MainWindow mw)
+        if (App.MainWindow is MainWindow mw)
             mw.NavigateTo("Connections");
     }
 

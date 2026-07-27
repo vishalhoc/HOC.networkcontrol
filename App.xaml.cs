@@ -18,6 +18,14 @@ public partial class App : Application
     public static Window Window { get; private set; } = null!;
 
     /// <summary>
+    /// Strongly-typed accessor for the main window.
+    /// IMP#25: replaces the fragile <c>App.MainWindow is MainWindow mw</c> cast
+    /// pattern used throughout the codebase. Returns null before the window
+    /// is created (during startup) so callers can do null-conditional calls.
+    /// </summary>
+    public static MainWindow? MainWindow => Window as MainWindow;
+
+    /// <summary>
     /// The UI thread dispatcher. Use <c>App.DispatcherQueue</c> to marshal calls
     /// to the UI thread. Fully qualified to avoid CS0104 ambiguity with
     /// <see cref="Windows.System.DispatcherQueue"/>.

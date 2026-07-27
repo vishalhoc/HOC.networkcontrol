@@ -30,6 +30,12 @@ public sealed partial class ProxyManagerPage : Page
     private HttpProxyService? _proxy => _vm?.ProxyService;
     private readonly ObservableCollection<ProxyRequestRow> _rows = new();
 
+    // FIX Bug#19: track whether THIS page was the one that started the capture
+    // proxy so we can stop it on navigate-away. Without this flag, navigating to
+    // another page left the system proxy permanently pointing at localhost:8080,
+    // silently intercepting all outgoing HTTP/HTTPS traffic until app close.
+    private bool _proxyStartedHere;
+
     public ProxyManagerPage() { this.InitializeComponent(); RequestsList.ItemsSource = _rows; }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -42,6 +48,7 @@ public sealed partial class ProxyManagerPage : Page
             _vm.ProxyService.Requests.CollectionChanged += OnProxyCapturesChanged;
             SyncRequestRows();
         }
+        _proxyStartedHere = false; // reset on every navigation-in
         RefreshStatus();
     }
 
@@ -50,6 +57,14 @@ public sealed partial class ProxyManagerPage : Page
         base.OnNavigatedFrom(e);
         if (_vm != null)
             _vm.ProxyService.Requests.CollectionChanged -= OnProxyCapturesChanged;
+
+        // FIX Bug#19: if this page started the capture proxy, stop it now so
+        // the system proxy isn't left pointing at our port after navigation.
+        if (_proxyStartedHere && _proxy?.IsRunning == true)
+        {
+            try { _proxy.Stop(); } catch { }
+            _proxyStartedHere = false;
+        }
     }
 
     // ── Status ────────────────────────────────────────────────────────────────
@@ -74,7 +89,12 @@ public sealed partial class ProxyManagerPage : Page
     private void OnStartCapture(object sender, RoutedEventArgs e)
     {
         if (_proxy == null) return;
-        try { _proxy.Start(setSystemProxy: true); ProxyActionStatus.Text = "✅ Capture proxy started and set as system proxy."; }
+        try
+        {
+            _proxy.Start(setSystemProxy: true);
+            _proxyStartedHere = true;
+            ProxyActionStatus.Text = "✅ Capture proxy started and set as system proxy.";
+        }
         catch (Exception ex) { ProxyActionStatus.Text = $"Error: {ex.Message}"; }
         RefreshStatus();
     }
@@ -82,7 +102,12 @@ public sealed partial class ProxyManagerPage : Page
     private void OnStartCaptureNoProxy(object sender, RoutedEventArgs e)
     {
         if (_proxy == null) return;
-        try { _proxy.Start(setSystemProxy: false); ProxyActionStatus.Text = "✅ Capture proxy started (capture only, system proxy unchanged)."; }
+        try
+        {
+            _proxy.Start(setSystemProxy: false);
+            _proxyStartedHere = true;
+            ProxyActionStatus.Text = "✅ Capture proxy started (capture only, system proxy unchanged).";
+        }
         catch (Exception ex) { ProxyActionStatus.Text = $"Error: {ex.Message}"; }
         RefreshStatus();
     }
@@ -90,7 +115,7 @@ public sealed partial class ProxyManagerPage : Page
     private void OnStopCapture(object sender, RoutedEventArgs e)
     {
         if (_proxy == null) return;
-        try { _proxy.Stop(); ProxyActionStatus.Text = "✅ Capture proxy stopped. System proxy restored."; }
+        try { _proxy.Stop(); _proxyStartedHere = false; ProxyActionStatus.Text = "✅ Capture proxy stopped. System proxy restored."; }
         catch (Exception ex) { ProxyActionStatus.Text = $"Error: {ex.Message}"; }
         RefreshStatus();
     }

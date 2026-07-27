@@ -381,13 +381,24 @@ public sealed partial class LanScannerPage : Page
                             dev.OpenPorts = await ScanCommonPortsAsync(ip, timeout);
 
                         foundBag.Add(dev);
+
+                        // FIX Bug#20: the old code called _devices.Clear() then
+                        // re-added ALL foundBag entries on every new host found.
+                        // This caused: ARP/block state reset on existing entries,
+                        // constant UI flicker as the list rebuilt ~every 50 ms,
+                        // and scan results briefly disappearing mid-scan.
+                        // Fix: insert or update only the one new device.
                         DispatcherQueue.TryEnqueue(() =>
                         {
-                            var sorted = foundBag
-                                .OrderBy(d => d.Ip.Split('.').Select(int.Parse).Last())
-                                .ToList();
-                            _devices.Clear();
-                            foreach (var d in sorted) _devices.Add(d);
+                            // Insert the device in IP-sorted order (last octet)
+                            int newOctet = int.TryParse(dev.Ip.Split('.').LastOrDefault(), out int o) ? o : 0;
+                            int insertAt = _devices.Count;
+                            for (int idx = 0; idx < _devices.Count; idx++)
+                            {
+                                int existOctet = int.TryParse(_devices[idx].Ip.Split('.').LastOrDefault(), out int eo) ? eo : 0;
+                                if (newOctet < existOctet) { insertAt = idx; break; }
+                            }
+                            _devices.Insert(insertAt, dev);
                             ApplyDeviceFilter();
                             StatHosts.Text = _devices.Count.ToString();
                         });

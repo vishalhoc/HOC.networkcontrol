@@ -43,7 +43,15 @@ public sealed partial class FirewallPage : Page
     {
         this.InitializeComponent();
         RulesList.ItemsSource = _filtered;
-        _syncDebounce.Tick += (_, _) => { _syncDebounce.Stop(); _ = LoadRulesAsync(); };
+        // FIX Bug#46: use a named handler so it can be removed in OnNavigatedFrom
+        _syncDebounce.Tick += OnSyncDebounceTick;
+    }
+
+    // Named debounce tick handler
+    private void OnSyncDebounceTick(object? sender, object e)
+    {
+        _syncDebounce.Stop();
+        _ = LoadRulesAsync();
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -59,6 +67,8 @@ public sealed partial class FirewallPage : Page
         base.OnNavigatedFrom(e);
         BlockedConnectionStore.ConnectionBlockChanged -= OnConnectionBlockChanged;
         _syncDebounce.Stop();
+        // FIX Bug#46: remove the named debounce tick handler to prevent accumulation
+        _syncDebounce.Tick -= OnSyncDebounceTick;
     }
 
     private void OnConnectionBlockChanged(string _, string __, int ___, int ____, bool _____)
@@ -198,10 +208,13 @@ public sealed partial class FirewallPage : Page
             return;
         }
 
-        string safeIp = ip.Replace(':', '_').Replace('.', '_');
+        // FIX Bug#10: sanitize IP for the rule name (colons → dashes for IPv6,
+        // dots → dashes for IPv4) so the rule name is always valid in netsh.
+        string safeIp = ip.Replace(':', '-').Replace('.', '-');
         string ruleName = $"WinNetControl_ConnOut_QuickIp_{safeIp}";
         RuleStatus.Text = $"Blocking {ip}…";
         await RunElevatedAsync("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=out action=block remoteip=\"{ip}\" enable=yes");
+        // FIX Bug#11: clear the input AFTER the command succeeds, not before
         QuickBlockIpBox.Text = string.Empty;
         RuleStatus.Text = $"Outbound traffic to {ip} is blocked.";
         await LoadRulesAsync();
@@ -239,11 +252,26 @@ public sealed partial class FirewallPage : Page
         remoteIp = string.Empty;
         remotePort = 0;
         localPort = 0;
-        var match = Regex.Match(ruleName, @"^WinNetControl_Conn(?:In|Out)_(.+)_(\d+)_(\d+)$", RegexOptions.IgnoreCase);
-        return match.Success &&
-               int.TryParse(match.Groups[2].Value, out remotePort) &&
-               int.TryParse(match.Groups[3].Value, out localPort) &&
-               System.Net.IPAddress.TryParse(remoteIp = match.Groups[1].Value, out _);
+        // FIX Bug#10: The IP in the rule name is stored with dashes (see safeIp
+        // construction above). IPv6 groups look like "2001-db8-..." so we
+        // restore colons after extraction to get a parseable IPv6 string.
+        // Pattern: WinNetControl_ConnIn_<ip-with-dashes>_<remotePort>_<localPort>
+        var match = Regex.Match(ruleName, @"^WinNetControl_Conn(?:In|Out)_(.+?)_(\d+)_(\d+)$", RegexOptions.IgnoreCase);
+        if (!match.Success) return false;
+        if (!int.TryParse(match.Groups[2].Value, out remotePort)) return false;
+        if (!int.TryParse(match.Groups[3].Value, out localPort))  return false;
+
+        // Try restoring an IPv6 address: replace dashes in groups-of-4-hex back to colons.
+        string candidate = match.Groups[1].Value;
+        // First try as-is (IPv4 with dashes, or simple IPv6)
+        if (System.Net.IPAddress.TryParse(candidate.Replace('-', '.'), out _))
+            remoteIp = candidate.Replace('-', '.');
+        else if (System.Net.IPAddress.TryParse(candidate.Replace('-', ':'), out _))
+            remoteIp = candidate.Replace('-', ':');
+        else
+            remoteIp = candidate; // leave as-is; TryParse will reject below
+
+        return System.Net.IPAddress.TryParse(remoteIp, out _);
     }
 
     // ── Quick actions ─────────────────────────────────────────────────────────

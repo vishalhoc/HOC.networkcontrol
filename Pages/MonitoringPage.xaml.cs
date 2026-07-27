@@ -28,6 +28,10 @@ public sealed partial class MonitoringPage : Page
 
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
 
+    // FIX Bug#9: subscription guard so that navigating back/forward never
+    // adds a second (third…) Tick handler, causing duplicate ticks per second.
+    private bool _timerSubscribed;
+
     // Graph history
     private const int HistoryMax = 60;
     private readonly List<double> _upHistory   = new();
@@ -53,7 +57,13 @@ public sealed partial class MonitoringPage : Page
             TopProcessList.ItemsSource = vm.FilteredProcesses;
         }
 
-        _timer.Tick += OnTick;
+        // FIX Bug#9: only subscribe once, regardless of how many times the page is navigated to
+        if (!_timerSubscribed)
+        {
+            _timer.Tick    += OnTick;
+            _timerSubscribed = true;
+        }
+
         _timer.Start();
         OnTick(null, null!);
     }
@@ -62,6 +72,14 @@ public sealed partial class MonitoringPage : Page
     {
         base.OnNavigatedFrom(e);
         _timer.Stop();
+
+        // FIX Bug#9: unsubscribe using the matching named method so the next
+        // OnNavigatedTo can safely re-subscribe without creating a double.
+        if (_timerSubscribed)
+        {
+            _timer.Tick    -= OnTick;
+            _timerSubscribed = false;
+        }
     }
 
     private void OnTick(object? sender, object e)

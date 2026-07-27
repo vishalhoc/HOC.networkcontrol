@@ -306,7 +306,7 @@ public sealed partial class ConnectionManagerPage : Page
     private void OnHostsManagerClicked(object sender, RoutedEventArgs e)
     {
         // Navigate via shell to the Hosts page
-        if (App.Window is MainWindow mw)
+        if (App.MainWindow is MainWindow mw)
             mw.NavigateTo("Hosts");
     }
 
@@ -320,7 +320,7 @@ public sealed partial class ConnectionManagerPage : Page
     // ── Settings ──────────────────────────────────────────────────────────────
     private void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
-        if (App.Window is MainWindow mw)
+        if (App.MainWindow is MainWindow mw)
             mw.NavigateTo("Settings");
     }
 
@@ -414,7 +414,7 @@ public sealed partial class ConnectionManagerPage : Page
     }
 
     private void OnCtxOpenQosManager(object sender, RoutedEventArgs e)
-        => (App.Window as MainWindow)?.NavigateTo("Qos");
+        => (App.MainWindow)?.NavigateTo("Qos");
 
     private void OnCtxBlock(object sender, RoutedEventArgs e)
     {
@@ -566,7 +566,7 @@ public sealed partial class ConnectionManagerPage : Page
     // ── Local Network Scanner ─────────────────────────────────────────────────
     private void OnLocalScannerClicked(object sender, RoutedEventArgs e)
     {
-        if (App.Window is MainWindow mw)
+        if (App.MainWindow is MainWindow mw)
             mw.NavigateTo("Lan");
     }
 

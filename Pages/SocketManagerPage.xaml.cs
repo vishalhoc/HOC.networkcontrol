@@ -131,7 +131,7 @@ public sealed partial class SocketManagerPage : Page
             if (string.IsNullOrEmpty(ip) || ip == "—") return;
             if (_viewModel != null)
                 _viewModel.TargetPacketJourneyIp = ip;
-            var mainWindow = App.Window as MainWindow;
+            var mainWindow = App.MainWindow;
             mainWindow?.NavigateTo("Journey");
         }
     }
@@ -287,7 +287,7 @@ public sealed partial class SocketManagerPage : Page
     }
 
     private void OnOpenQosManager(object sender, RoutedEventArgs e)
-        => (App.Window as MainWindow)?.NavigateTo("Qos");
+        => (App.MainWindow)?.NavigateTo("Qos");
 
     private void OnRefreshSockets(object sender, RoutedEventArgs e) => _ = LoadSocketsAsync();
     private void OnProtoFilterChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();

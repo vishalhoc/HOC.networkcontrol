@@ -124,22 +124,17 @@ public sealed partial class SettingsPage : Page
         string tag = ((ComboBoxItem)ThemeCombo.SelectedItem)?.Tag?.ToString() ?? "default";
         _cfg.AppTheme = tag switch { "dark" => "Dark", "light" => "Light", _ => "System" };
 
-        if (App.Window?.Content is FrameworkElement root)
-        {
-            root.RequestedTheme = tag switch
-            {
-                "dark"  => ElementTheme.Dark,
-                "light" => ElementTheme.Light,
-                _       => ElementTheme.Default
-            };
-        }
+        // Delegate to the centralised ApplyTheme which also re-colours the
+        // NavView pane background (fixes Bug#23 — theme was not applied to
+        // the sidebar when changed from Settings).
+        App.MainWindow?.ApplyTheme(_cfg.AppTheme);
     }
 
     private void OnNavPaneChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_loaded) return;
         string tag = ((ComboBoxItem)NavPaneCombo.SelectedItem)?.Tag?.ToString() ?? "left";
-        if (App.Window is MainWindow mw) mw.UpdateNavPaneMode(tag);
+        if (App.MainWindow is MainWindow mw) mw.UpdateNavPaneMode(tag);
     }
 
     private void OnAcrylicToggled(object sender, RoutedEventArgs e)

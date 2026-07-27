@@ -1033,7 +1033,7 @@ public sealed partial class HashcatPage : Page
     }
     private void OnGoToWifiPentest(object sender, RoutedEventArgs e)
     {
-        if (App.Window is MainWindow mw)
+        if (App.MainWindow is MainWindow mw)
             mw.NavigateTo("WifiPentest");
     }
 

@@ -213,9 +213,27 @@ public sealed partial class MainWindow : Window
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                HeaderUpText.Text      = $"↑ {ViewModel.GlobalUploadText}";
-                HeaderDownText.Text    = $"↓ {ViewModel.GlobalDownloadText}";
-                HeaderBlockedText.Text = ViewModel.BlockedCountText;
+                HeaderUpText.Text   = $"\u2191 {ViewModel.GlobalUploadText}";
+                HeaderDownText.Text = $"\u2193 {ViewModel.GlobalDownloadText}";
+
+                // FIX Bug#21: HeaderBlockedBadge was permanently visible even when
+                // 0 apps are blocked because Visibility was never toggled.
+                // Parse the count from BlockedCountText ("N blocked") and hide
+                // the entire red badge when there is nothing to report.
+                int blockedCount = 0;
+                var parts = ViewModel.BlockedCountText?.Split(' ');
+                if (parts?.Length > 0) int.TryParse(parts[0], out blockedCount);
+
+                if (blockedCount > 0)
+                {
+                    HeaderBlockedBadge.Visibility = Visibility.Visible;
+                    HeaderBlockedText.Text        = ViewModel.BlockedCountText;
+                }
+                else
+                {
+                    HeaderBlockedBadge.Visibility = Visibility.Collapsed;
+                    HeaderBlockedText.Text        = string.Empty;
+                }
             });
         }
     }
@@ -308,6 +326,11 @@ public sealed partial class MainWindow : Window
     }
 
     // ── Minimize to Tray ──────────────────────────────────────────────────────
+    // FIX Bug#1: removed the 5-second auto-restore (Task.Delay) that always
+    //            brought the window back — the window now stays hidden until
+    //            the user clicks the tray icon.
+    // FIX Bug#22: reuse the existing _tray if it was already created in the
+    //             constructor to avoid instantiating two TrayService instances.
     private void OnMinimizeToTrayClicked(object sender, RoutedEventArgs e)
     {
         if (_tray == null)
@@ -316,19 +339,18 @@ public sealed partial class MainWindow : Window
             _tray = new Core.TrayService(hwnd, DispatcherQueue);
         }
         this.Hide();
-        System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ =>
-        {
-            DispatcherQueue.TryEnqueue(() => this.Show());
-        });
     }
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────────
     private void OnGlobalKeyDown(object sender,
-                                  Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+                                   Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
         bool ctrl = Microsoft.UI.Input.InputKeyboardSource
                               .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control)
                               .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+        bool shift = Microsoft.UI.Input.InputKeyboardSource
+                               .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift)
+                               .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
         switch (e.Key)
         {
             case Windows.System.VirtualKey.F5:
@@ -336,6 +358,7 @@ public sealed partial class MainWindow : Window
                 e.Handled = true;
                 break;
 
+            // ── Navigation shortcuts (Ctrl+1 – Ctrl+9) ──────────────────────
             case Windows.System.VirtualKey.Number1 when ctrl:
                 NavigateTo("Dashboard");
                 e.Handled = true;
@@ -348,6 +371,43 @@ public sealed partial class MainWindow : Window
 
             case Windows.System.VirtualKey.Number3 when ctrl:
                 NavigateTo("Firewall");
+                e.Handled = true;
+                break;
+
+            // IMP#17: Ctrl+4–Ctrl+9 shortcut keys added
+            case Windows.System.VirtualKey.Number4 when ctrl:
+                NavigateTo("Monitoring");
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.Number5 when ctrl:
+                NavigateTo("Diagnostics");
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.Number6 when ctrl:
+                NavigateTo("Lan");
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.Number7 when ctrl:
+                NavigateTo("PacketCapture");
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.Number8 when ctrl:
+                NavigateTo("Security");
+                e.Handled = true;
+                break;
+
+            case Windows.System.VirtualKey.Number9 when ctrl:
+                NavigateTo("Settings");
+                e.Handled = true;
+                break;
+
+            // IMP#27: Ctrl+Shift+T cycles dark / light / default theme
+            case Windows.System.VirtualKey.T when ctrl && shift:
+                OnThemeToggleClicked(this, new RoutedEventArgs());
                 e.Handled = true;
                 break;
         }

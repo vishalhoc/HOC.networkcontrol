@@ -16,6 +16,17 @@ public partial class MainViewModel : ObservableObject
     private readonly VirusTotalService _vtService = new();
     private int _speedSortTickCount; // throttles speed-based re-sorts to every ~4.5 s
 
+    // FIX Bug#18: keep a hard reference so the timer is not garbage-collected
+    // immediately (local 'var' in the constructor was eligible for GC at the
+    // first collection after construction, causing the session clock to stop).
+    private System.Threading.Timer? _sessionTimer;
+
+    // FIX Bug#14: track in-flight VT scans by file path so a second button-click
+    // while a scan is already running (or queued in the rate-limiter) is a no-op
+    // rather than launching another concurrent API call that wastes quota.
+    private readonly System.Collections.Generic.HashSet<string> _vtScanningPaths
+        = new(StringComparer.OrdinalIgnoreCase);
+
 
     public AppConfig CurrentConfig { get; internal set; }
     public HttpProxyService ProxyService { get; }
@@ -69,8 +80,9 @@ public partial class MainViewModel : ObservableObject
 
         LoadNetworkAdapters();
 
-        // Session timer — updates SessionDuration every second
-        var sessionTimer = new System.Threading.Timer(_ =>
+        // FIX Bug#18: assign to a field (not a local var) so the timer is never
+        // collected by the GC between constructor return and actual use.
+        _sessionTimer = new System.Threading.Timer(_ =>
         {
             _dispatcherQueue?.TryEnqueue(() => OnPropertyChanged(nameof(SessionDuration)));
         }, null, 1000, 1000);
@@ -1092,6 +1104,16 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        // FIX Bug#14: bail if an in-flight scan for the same file is already running.
+        // Without this guard a rapid double-click would queue two concurrent API calls
+        // for the same hash, wasting one of the 4 req/min quota slots.
+        string filePath = process.ProcessPath;
+        lock (_vtScanningPaths)
+        {
+            if (_vtScanningPaths.Contains(filePath)) return;
+            _vtScanningPaths.Add(filePath);
+        }
+
         // Show checking state synchronously (already on UI thread via async void caller)
         process.VtStatus = Core.VtStatus.Checking;
         process.VtScore  = string.Empty;
@@ -1099,11 +1121,16 @@ public partial class MainViewModel : ObservableObject
         VtResult result;
         try
         {
-            result = await _vtService.CheckFileAsync(process.ProcessPath, VtApiKey);
+            result = await _vtService.CheckFileAsync(filePath, VtApiKey);
         }
         catch (Exception ex)
         {
             result = new VtResult { Status = Core.VtStatus.Error, Message = $"Unexpected: {ex.Message}" };
+        }
+        finally
+        {
+            // Always release the scan lock so the user can retry later
+            lock (_vtScanningPaths) _vtScanningPaths.Remove(filePath);
         }
 
         // Friendly score labels for non-numeric statuses

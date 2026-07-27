@@ -79,23 +79,28 @@ public sealed partial class WirelessPage : Page
         int signalPct = 0;
         if (int.TryParse(Regex.Match(signal, @"\d+").Value, out int sp)) signalPct = sp;
 
-        // Get IP from adapter
-        string ip = "—";
-        try
+        // FIX Bug#25: GetAllNetworkInterfaces() is backed by WMI/IPHLPAPI and can
+        // block the calling thread for 2-3 s on first call. Move it to the thread
+        // pool so the UI never freezes while the wireless page loads or refreshes.
+        string ip = await Task.Run(() =>
         {
-            foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+            try
             {
-                if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Wireless80211 &&
-                    ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
                 {
-                    var addr = ni.GetIPProperties().UnicastAddresses
-                        .FirstOrDefault(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    if (addr != null) ip = addr.Address.ToString();
-                    break;
+                    if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Wireless80211 &&
+                        ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                    {
+                        var addr = ni.GetIPProperties().UnicastAddresses
+                            .FirstOrDefault(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                        if (addr != null) return addr.Address.ToString();
+                        break;
+                    }
                 }
             }
-        }
-        catch { }
+            catch { }
+            return "—";
+        });
 
         DispatcherQueue.TryEnqueue(() =>
         {
@@ -116,6 +121,7 @@ public sealed partial class WirelessPage : Page
             SignalBar.Value    = signalPct;
         });
     }
+
 
     // ── Nearby networks ───────────────────────────────────────────────────────
     private async void OnScanNetworks(object sender, RoutedEventArgs e)
@@ -433,7 +439,7 @@ public sealed partial class WirelessPage : Page
 
     private void OnGoToGpuCracker(object sender, RoutedEventArgs e)
     {
-        if (App.Window is MainWindow mw)
+        if (App.MainWindow is MainWindow mw)
             mw.NavigateTo("HashcatPage");
     }
 

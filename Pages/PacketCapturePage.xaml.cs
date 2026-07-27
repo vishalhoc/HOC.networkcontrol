@@ -143,7 +143,7 @@ public sealed partial class PacketCapturePage : Page
     {
         if (ViewModel == null || string.IsNullOrWhiteSpace(ip)) return;
         ViewModel.TargetPacketJourneyIp = ip;
-        (App.Window as MainWindow)?.NavigateTo("Journey");
+        (App.MainWindow)?.NavigateTo("Journey");
     }
 
     private static void CopyToClipboard(string value)

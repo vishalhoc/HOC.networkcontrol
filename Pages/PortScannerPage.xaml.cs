@@ -70,12 +70,16 @@ public sealed partial class PortScannerPage : Page
         ScanProgress.Visibility = Visibility.Visible;
         OpenCount.Text  = "0 open";
 
+        // FIX Bug#24: dispose the previous CTS before allocating a new one.
+        // The old IsCancellationRequested state was carried over between scans
+        // and tasks that checked it would exit prematurely on the next scan.
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
         int total = toP - fromP + 1;
         int done  = 0;
         int open  = 0;
 
-        var semaphore = new SemaphoreSlim(200);
+        using var semaphore = new SemaphoreSlim(200);
 
         var tasks = Enumerable.Range(fromP, total).Select(async port =>
         {
