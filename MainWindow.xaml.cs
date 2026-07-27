@@ -1,5 +1,6 @@
-using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Animation;
 using WinNetControl.ViewModels;
 using WinNetControl.Pages;
 using WinUIEx;
@@ -24,6 +25,11 @@ public sealed partial class MainWindow : Window
 
     // Tray service
     private WinNetControl.Core.TrayService? _tray;
+
+    // UX#20: debounce timer so rapid speed ticks coalesce into one animation
+    private readonly System.Threading.Timer _headerDebounce;
+    private string _pendingUp   = string.Empty;
+    private string _pendingDown = string.Empty;
 
     public MainWindow()
     {
@@ -69,6 +75,11 @@ public sealed partial class MainWindow : Window
 
         // Wire up live speed header ticker
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // UX#20: init debounce timer (disabled by default — enabled on first speed update)
+        _headerDebounce = new System.Threading.Timer(
+            _ => DispatcherQueue?.TryEnqueue(FlushHeaderAnimation),
+            null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
 
         // System tray icon
         this.DispatcherQueue.TryEnqueue(() =>
@@ -266,23 +277,24 @@ public sealed partial class MainWindow : Window
         return false;
     }
 
-    // ── Live speed header update ───────────────────────────────────────────────
+    // ── Live speed header update ─────────────────────────────────────────────
     private void OnViewModelPropertyChanged(object? sender,
                                             System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ViewModel.GlobalUploadText)
-                           or nameof(ViewModel.GlobalDownloadText)
-                           or nameof(ViewModel.BlockedCountText))
+                           or nameof(ViewModel.GlobalDownloadText))
         {
+            // UX#20: debounce rapid speed ticks — animate in FlushHeaderAnimation
+            _pendingUp   = $"\u2191 {ViewModel.GlobalUploadText}";
+            _pendingDown = $"\u2193 {ViewModel.GlobalDownloadText}";
+            _headerDebounce.Change(120, System.Threading.Timeout.Infinite);
+        }
+        else if (e.PropertyName is nameof(ViewModel.BlockedCountText))
+        {
+            // Badge update is infrequent — run directly on UI thread
             DispatcherQueue.TryEnqueue(() =>
             {
-                HeaderUpText.Text   = $"\u2191 {ViewModel.GlobalUploadText}";
-                HeaderDownText.Text = $"\u2193 {ViewModel.GlobalDownloadText}";
-
-                // FIX Bug#21: HeaderBlockedBadge was permanently visible even when
-                // 0 apps are blocked because Visibility was never toggled.
-                // Parse the count from BlockedCountText ("N blocked") and hide
-                // the entire red badge when there is nothing to report.
+                // FIX Bug#21: parse count from "N blocked" and toggle badge visibility
                 int blockedCount = 0;
                 var parts = ViewModel.BlockedCountText?.Split(' ');
                 if (parts?.Length > 0) int.TryParse(parts[0], out blockedCount);
@@ -294,7 +306,7 @@ public sealed partial class MainWindow : Window
 
                     // UX#11: Connections dot — orange when blocked apps exist
                     NavConnDot.Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                        Microsoft.UI.ColorHelper.FromArgb(255, 251, 146, 60));  // orange-400
+                        Microsoft.UI.ColorHelper.FromArgb(255, 251, 146, 60));
                     ToolTipService.SetToolTip(NavConnDot, $"{blockedCount} app(s) blocked");
                 }
                 else
@@ -304,11 +316,40 @@ public sealed partial class MainWindow : Window
 
                     // UX#11: Connections dot — green when all apps are unblocked
                     NavConnDot.Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                        Microsoft.UI.ColorHelper.FromArgb(255, 16, 185, 129));  // emerald-500
+                        Microsoft.UI.ColorHelper.FromArgb(255, 16, 185, 129));
                     ToolTipService.SetToolTip(NavConnDot, "All apps unblocked");
                 }
             });
         }
+    }
+
+    // UX#20: flush pending speed text with a cross-fade animation
+    private async void FlushHeaderAnimation()
+    {
+        // Fade out
+        HeaderUpText.Opacity   = 1;
+        HeaderDownText.Opacity = 1;
+        var fadeOut = new DoubleAnimation { To = 0.3, Duration = TimeSpan.FromMilliseconds(80) };
+        var sb1 = new Storyboard();
+        Storyboard.SetTarget(fadeOut, HeaderUpText);
+        Storyboard.SetTargetProperty(fadeOut, "Opacity");
+        sb1.Children.Add(fadeOut);
+        sb1.Begin();
+        await System.Threading.Tasks.Task.Delay(90);
+
+        // Swap text
+        HeaderUpText.Text   = _pendingUp;
+        HeaderDownText.Text = _pendingDown;
+
+        // Fade in
+        var fadeIn = new DoubleAnimation { From = 0.3, To = 1, Duration = TimeSpan.FromMilliseconds(120) };
+        var sb2 = new Storyboard();
+        Storyboard.SetTarget(fadeIn, HeaderUpText);
+        Storyboard.SetTargetProperty(fadeIn, "Opacity");
+        sb2.Children.Add(fadeIn);
+        HeaderUpText.Opacity   = 0.3;
+        HeaderDownText.Opacity = 0.3;
+        sb2.Begin();
     }
 
     // ── Theme ─────────────────────────────────────────────────────────────────

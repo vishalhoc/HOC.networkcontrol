@@ -290,3 +290,29 @@ public class VtStatusToForegroundConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, string language)
         => throw new NotImplementedException();
 }
+
+/// <summary>
+/// UX#24: Maps raw bytes/sec (double) to a colored SolidColorBrush by speed tier.
+/// idle→gray, low→blue/green, medium→sky/teal, high→orange, very high→red.
+/// Pass ConverterParameter="download" for the green/teal family; default is blue/sky (upload).
+/// </summary>
+public class SpeedTierToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        double bps = value is double d ? d : 0;
+        bool dl = parameter is string p && p == "download";
+        return bps switch
+        {
+            >= 10_000_000                  => new SolidColorBrush(Color.FromArgb(255, 239, 68,  68)),  // red
+            >= 1_000_000                   => new SolidColorBrush(Color.FromArgb(255, 249, 115, 22)),  // orange
+            >= 100_000 when dl             => new SolidColorBrush(Color.FromArgb(255, 20,  184, 166)), // teal
+            >= 100_000                     => new SolidColorBrush(Color.FromArgb(255, 56,  189, 248)), // sky
+            > 0        when dl             => new SolidColorBrush(Color.FromArgb(255, 16,  185, 129)), // green
+            > 0                            => new SolidColorBrush(Color.FromArgb(255, 59,  130, 246)), // blue
+            _                              => new SolidColorBrush(Color.FromArgb(100, 150, 150, 150)), // gray
+        };
+    }
+    public object ConvertBack(object v, Type t, object p, string l)
+        => throw new NotImplementedException();
+}

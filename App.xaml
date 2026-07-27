@@ -28,6 +28,7 @@
             <core:DataUsageTierToVisibilityConverter x:Key="DataUsageTierToVisibilityConverter"/>
             <core:SuspiciousToBrushConverter         x:Key="SuspiciousToBrushConverter"/>
             <core:VtStatusToForegroundConverter      x:Key="VtStatusToForegroundConverter"/>
+            <core:SpeedTierToBrushConverter          x:Key="SpeedTierToBrushConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

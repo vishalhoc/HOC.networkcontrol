@@ -57,6 +57,10 @@ public sealed partial class ConnectionManagerPage : Page
             UpdateEmptyState();
         }
         BlockedConnectionStore.ConnectionBlockChanged += OnExternalBlockChanged;
+
+        // UX#2: show skeleton until first batch of data arrives
+        if (SkeletonPanel != null && (ViewModel == null || ViewModel.FilteredProcesses.Count == 0))
+            SkeletonPanel.Visibility = Visibility.Visible;
     }
 
     protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -78,6 +82,11 @@ public sealed partial class ConnectionManagerPage : Page
     {
         if (EmptyState == null || ViewModel == null) return;
         bool isEmpty = ViewModel.FilteredProcesses.Count == 0;
+
+        // UX#2: hide skeleton as soon as any process data arrives
+        if (!isEmpty && SkeletonPanel != null)
+            SkeletonPanel.Visibility = Visibility.Collapsed;
+
         EmptyState.Visibility = isEmpty ? Visibility.Visible : Visibility.Collapsed;
         if (isEmpty && !string.IsNullOrWhiteSpace(ViewModel.SearchText))
             EmptyStateSub.Text = $"No results for \"{ViewModel.SearchText}\" — try a different name.";

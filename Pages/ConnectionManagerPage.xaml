@@ -458,6 +458,29 @@
                 </StackPanel>
             </Grid>
 
+            <!-- UX#2: Skeleton shimmer loader — shown while processes are loading -->
+            <Grid x:Name="SkeletonPanel" Grid.Row="1"
+                  Visibility="Collapsed" VerticalAlignment="Top">
+                <Grid.Resources>
+                    <!-- Shimmer gradient: translucent → opaque white → translucent -->
+                    <LinearGradientBrush x:Key="ShimmerBrush" StartPoint="0,0.5" EndPoint="1,0.5">
+                        <GradientStop x:Name="ShimmerStop0" Color="#1AFFFFFF" Offset="0.0"/>
+                        <GradientStop x:Name="ShimmerStop1" Color="#55FFFFFF" Offset="0.4"/>
+                        <GradientStop x:Name="ShimmerStop2" Color="#1AFFFFFF" Offset="0.8"/>
+                    </LinearGradientBrush>
+                </Grid.Resources>
+                <StackPanel Spacing="6" Margin="12,8">
+                    <!-- 7 placeholder rows -->
+                    <Border Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.6"/>
+                    <Border Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.55"/>
+                    <Border Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.5"/>
+                    <Border Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.45"/>
+                    <Border Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.4"/>
+                    <Border Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.35"/>
+                    <Border Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.3"/>
+                </StackPanel>
+            </Grid>
+
             <!-- Process list -->
             <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.FilteredProcesses, Mode=OneWay}"
                       SelectionMode="None"
@@ -569,10 +592,12 @@
                                             <RowDefinition Height="3"/>
                                         </Grid.RowDefinitions>
                                         <TextBlock Grid.Row="0" Text="{Binding UploadSpeed, Converter={StaticResource SpeedConverter}}"
-                                                   Foreground="#0078D4" FontSize="12"/>
+                                                   Foreground="{Binding UploadSpeed, Converter={StaticResource SpeedTierToBrushConverter}}" FontSize="12"/>
                                         <Border Grid.Row="1" CornerRadius="2" HorizontalAlignment="Left"
                                                 Width="{Binding UploadSpeedRatio, Converter={StaticResource RatioToWidthConverter}, ConverterParameter=90}"
-                                                Height="3" Background="#0078D4" Opacity="0.7"/>
+                                                Height="3"
+                                                Background="{Binding UploadSpeed, Converter={StaticResource SpeedTierToBrushConverter}}"
+                                                Opacity="0.7"/>
                                     </Grid>
 
                                     <!-- Download speed + mini bar -->
@@ -582,10 +607,12 @@
                                             <RowDefinition Height="3"/>
                                         </Grid.RowDefinitions>
                                         <TextBlock Grid.Row="0" Text="{Binding DownloadSpeed, Converter={StaticResource SpeedConverter}}"
-                                                   Foreground="#107C10" FontSize="12"/>
+                                                   Foreground="{Binding DownloadSpeed, Converter={StaticResource SpeedTierToBrushConverter}, ConverterParameter=download}" FontSize="12"/>
                                         <Border Grid.Row="1" CornerRadius="2" HorizontalAlignment="Left"
                                                 Width="{Binding DownloadSpeedRatio, Converter={StaticResource RatioToWidthConverter}, ConverterParameter=90}"
-                                                Height="3" Background="#107C10" Opacity="0.7"/>
+                                                Height="3"
+                                                Background="{Binding DownloadSpeed, Converter={StaticResource SpeedTierToBrushConverter}, ConverterParameter=download}"
+                                                Opacity="0.7"/>
                                     </Grid>
 
                                     <TextBlock Grid.Column="6" Text="{Binding TotalDataUsed, Converter={StaticResource SizeConverter}}"
