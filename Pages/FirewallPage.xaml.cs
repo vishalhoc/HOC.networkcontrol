@@ -39,12 +39,21 @@ public sealed partial class FirewallPage : Page
     private readonly ObservableCollection<FirewallRuleItem> _filtered = new();
     private readonly DispatcherTimer _syncDebounce = new() { Interval = TimeSpan.FromSeconds(1) };
 
+    // IMP#9: debounce search keystrokes (200 ms) + cache sorted order
+    private readonly DispatcherTimer _searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private List<FirewallRuleItem> _sortedRules = new();
+
+    // IMP#6: tracks an in-flight batch delete so it can be cancelled
+    private System.Threading.CancellationTokenSource? _batchDeleteCts;
+
     public FirewallPage()
     {
         this.InitializeComponent();
         RulesList.ItemsSource = _filtered;
         // FIX Bug#46: use a named handler so it can be removed in OnNavigatedFrom
         _syncDebounce.Tick += OnSyncDebounceTick;
+        // IMP#9: search debounce — fires ApplySearch only when typing pauses
+        _searchDebounce.Tick += OnSearchDebounceTick;
     }
 
     // Named debounce tick handler
@@ -113,6 +122,7 @@ public sealed partial class FirewallPage : Page
 
             _rules.Clear();
             foreach (var r in items) _rules.Add(r);
+            RebuildSortCache();                          // IMP#9: refresh sort cache
             ApplySearch(RuleSearchBox.Text);
             RulesStatusBar.Text = $"{_rules.Count} WinNetControl rules found";
         }
@@ -120,23 +130,41 @@ public sealed partial class FirewallPage : Page
         finally { RulesProgress.Visibility = Visibility.Collapsed; }
     }
 
+    // IMP#9: separate sort cache — only re-sort when sort order changes
+    private void RebuildSortCache()
+    {
+        _sortedRules = (RuleSortBox?.SelectedItem is ComboBoxItem { Tag: "type" }
+            ? _rules.OrderBy(r => r.RuleType).ThenBy(r => r.Name)
+            : (IEnumerable<FirewallRuleItem>)_rules.OrderBy(r => r.Name)).ToList();
+    }
+
     private void ApplySearch(string query)
     {
         _filtered.Clear();
         var q = query.Trim().ToLowerInvariant();
-        var ordered = RuleSortBox?.SelectedItem is ComboBoxItem { Tag: "type" }
-            ? _rules.OrderBy(r => r.RuleType).ThenBy(r => r.Name)
-            : _rules.OrderBy(r => r.Name);
-        foreach (var r in ordered)
+        foreach (var r in _sortedRules)
             if (q.Length == 0 || r.Name.ToLowerInvariant().Contains(q))
                 _filtered.Add(r);
     }
 
+    // IMP#9: debounced search — reset timer on each keystroke
     private void OnRuleSearch(object sender, TextChangedEventArgs e)
-        => ApplySearch(RuleSearchBox.Text);
+    {
+        _searchDebounce.Stop();
+        _searchDebounce.Start();
+    }
+
+    private void OnSearchDebounceTick(object? sender, object e)
+    {
+        _searchDebounce.Stop();
+        ApplySearch(RuleSearchBox?.Text ?? string.Empty);
+    }
 
     private void OnRuleSortChanged(object sender, SelectionChangedEventArgs e)
-        => ApplySearch(RuleSearchBox?.Text ?? string.Empty);
+    {
+        RebuildSortCache();
+        ApplySearch(RuleSearchBox?.Text ?? string.Empty);
+    }
 
     // ── Profile control ───────────────────────────────────────────────────────
     private async void OnProfileOn(object sender, RoutedEventArgs e)
@@ -292,21 +320,93 @@ public sealed partial class FirewallPage : Page
         await LoadRulesAsync();
     }
 
+    // IMP#6: Parallel batch delete with progress bar and cancel support
     private async void OnDeleteAllWnc(object sender, RoutedEventArgs e)
     {
+        var snapshot = _rules.ToList();
+        if (snapshot.Count == 0) return;
+
         var dlg = new ContentDialog
         {
             Title   = "Delete All WinNetControl Rules?",
-            Content = $"This will delete all {_rules.Count} WinNetControl firewall rules.",
+            Content = $"This will delete all {snapshot.Count} WinNetControl firewall rules. You can cancel mid-way.",
             PrimaryButtonText   = "Delete All",
             SecondaryButtonText = "Cancel",
             XamlRoot = this.XamlRoot
         };
         if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
-        RulesProgress.Visibility = Visibility.Visible;
-        foreach (var rule in _rules.ToList())
-            await RunElevatedAsync("netsh", $"advfirewall firewall delete rule name=\"{rule.Name}\"");
+
+        // Show progress UI
+        _batchDeleteCts = new System.Threading.CancellationTokenSource();
+        var cts   = _batchDeleteCts;
+        int total = snapshot.Count;
+        int done  = 0;
+
+        RulesProgress.Maximum   = total;
+        RulesProgress.Value     = 0;
+        RulesProgress.Visibility        = Visibility.Visible;
+        CancelBatchDelete.Visibility    = Visibility.Visible;
+        RulesStatusBar.Text             = $"Deleting 0 / {total}…";
+
+        // Parallel delete — max 4 concurrent netsh calls
+        var sem = new System.Threading.SemaphoreSlim(4);
+        var tasks = snapshot.Select(async rule =>
+        {
+            await sem.WaitAsync(cts.Token).ConfigureAwait(false);
+            try
+            {
+                if (cts.Token.IsCancellationRequested) return;
+                await RunElevatedAsync("netsh",
+                    $"advfirewall firewall delete rule name=\"{rule.Name}\"");
+            }
+            finally
+            {
+                sem.Release();
+                int n = System.Threading.Interlocked.Increment(ref done);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    RulesProgress.Value = n;
+                    RulesStatusBar.Text = $"Deleting {n} / {total}…";
+                });
+            }
+        });
+
+        try
+        {
+            await Task.WhenAll(tasks);
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RulesStatusBar.Text = $"Deleted {done} rule(s).";
+                App.MainWindow?.ShowToast("Firewall", $"Deleted {done} rule(s).", "success");
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RulesStatusBar.Text = $"Cancelled after {done} deletion(s).";
+                App.MainWindow?.ShowToast("Firewall", $"Batch delete cancelled ({done} deleted).", "warning");
+            });
+        }
+        finally
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RulesProgress.Visibility     = Visibility.Collapsed;
+                CancelBatchDelete.Visibility = Visibility.Collapsed;
+            });
+            _batchDeleteCts?.Dispose();
+            _batchDeleteCts = null;
+        }
+
         await LoadRulesAsync();
+    }
+
+    // IMP#6: Cancel button handler
+    private void OnCancelBatchDelete(object sender, RoutedEventArgs e)
+    {
+        _batchDeleteCts?.Cancel();
+        CancelBatchDelete.IsEnabled = false;
     }
 
     private void OnExportRules(object sender, RoutedEventArgs e)

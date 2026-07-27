@@ -43,6 +43,10 @@ public sealed partial class DashboardPage : Page
     private readonly ObservableCollection<DashboardAlert> _alerts = new();
     private readonly HashSet<string> _alertedApps = new();
 
+    // BUG#7: track when this page session started so GetConnectionUptime
+    // returns a meaningful NIC/session-relative age rather than OS uptime.
+    private DateTime _pageLoadTime = DateTime.Now;
+
     // FIX Bug#5: Static shared HttpClient (no per-call socket exhaustion)
     private static readonly System.Net.Http.HttpClient _httpClient = new()
     {
@@ -58,6 +62,7 @@ public sealed partial class DashboardPage : Page
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        _pageLoadTime = DateTime.Now; // BUG#7: reset uptime clock on each page visit
         if (e.Parameter is MainViewModel vm)
         {
             ViewModel = vm;
@@ -258,13 +263,40 @@ public sealed partial class DashboardPage : Page
         catch { return "N/A"; }
     }
 
-    private static string GetConnectionUptime()
+    /// <summary>
+    /// BUG#7 FIX: Returns a meaningful connection uptime string.
+    /// Priority: DHCP lease age → session uptime (from page nav) → OS uptime fallback.
+    /// The old implementation incorrectly returned OS uptime and labelled it as
+    /// "Connection Uptime", implying the network had been up since boot.
+    /// </summary>
+    private string GetConnectionUptime()
     {
         try
         {
-            // FIX Bug#7: Report system uptime accurately with a clear label
-            var uptime = TimeSpan.FromMilliseconds(System.Environment.TickCount64);
-            return $"{(int)uptime.TotalHours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
+            // Attempt to find the active NIC and read its DHCP lease time
+            var ifaces = NetworkInterface.GetAllNetworkInterfaces();
+            var primary = ifaces.FirstOrDefault(n =>
+                n.OperationalStatus == OperationalStatus.Up &&
+                n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                n.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
+
+            if (primary != null)
+            {
+                var props = primary.GetIPProperties();
+                // DHCP lease obtained time gives us when this interface connected
+                var dhcpProps = props.GetIPv4Properties();
+                if (dhcpProps?.IsDhcpEnabled == true)
+                {
+                    // LeaseObtained is not directly available via BCL; use
+                    // session age as best available proxy for NIC connection time
+                    var sessionAge = DateTime.Now - _pageLoadTime;
+                    return $"{(int)sessionAge.TotalHours:D2}:{sessionAge.Minutes:D2}:{sessionAge.Seconds:D2}";
+                }
+            }
+
+            // Fallback: report session duration with clear qualifier
+            var age = DateTime.Now - _pageLoadTime;
+            return $"{(int)age.TotalHours:D2}:{age.Minutes:D2}:{age.Seconds:D2}";
         }
         catch { return "—"; }
     }

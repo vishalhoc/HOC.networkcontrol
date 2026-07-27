@@ -68,6 +68,10 @@ public sealed partial class SparklineControl : UserControl
         // the first time. Without this the graph stays blank until the next ETW
         // data tick because ActualWidth/Height are 0 at construction time.
         SizeChanged += (_, __) => Redraw();
+
+        // IMP#20: hover tooltip — show exact KB/s value at cursor X position
+        SparkCanvas.PointerMoved += OnPointerMoved;
+        SparkCanvas.PointerExited += OnPointerExited;
     }
 
     // ── Theme / colour ─────────────────────────────────────────────────────────
@@ -153,4 +157,32 @@ public sealed partial class SparklineControl : UserControl
         _fill.Points.Add(new Windows.Foundation.Point(w, h));
         _fill.Points.Add(new Windows.Foundation.Point(0, h));
     }
+
+    // ── IMP#20: Hover tooltip ──────────────────────────────────────────────────
+    private void OnPointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        var samples = SpeedSamples;
+        if (samples == null || samples.Count == 0) return;
+
+        double w = SparkCanvas.ActualWidth;
+        if (w <= 0) return;
+
+        var pos   = e.GetCurrentPoint(SparkCanvas).Position;
+        int n     = samples.Count;
+        double step = w / Math.Max(n - 1, 1);
+
+        // Clamp to valid index range
+        int idx = (int)Math.Round(pos.X / step);
+        idx = Math.Max(0, Math.Min(n - 1, idx));
+
+        double kbps = samples[idx];
+        string tip  = kbps >= 1024
+            ? $"{kbps / 1024:F1} MB/s"
+            : $"{kbps:F1} KB/s";
+
+        ToolTipService.SetToolTip(SparkCanvas, tip);
+    }
+
+    private void OnPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        => ToolTipService.SetToolTip(SparkCanvas, null);
 }

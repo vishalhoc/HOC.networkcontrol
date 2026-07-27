@@ -250,13 +250,26 @@
                     </ListView>
 
                     <!-- Status bar -->
-                    <Border Grid.Row="3" Padding="14,8"
+                    <Border Grid.Row="3" Padding="12,6"
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
                         <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
                             <TextBlock x:Name="RulesStatusBar" Text="Loading rules…"
                                        FontSize="11" Foreground="Gray" VerticalAlignment="Center"/>
-                            <ProgressBar x:Name="RulesProgress" HorizontalAlignment="Right"
-                                         Width="120" Height="4" IsIndeterminate="True" Visibility="Collapsed"/>
+                            <!-- IMP#6: determinate progress + cancel for batch delete -->
+                            <ProgressBar x:Name="RulesProgress" Grid.Column="1"
+                                         Width="140" Height="4" Margin="8,0"
+                                         Minimum="0" Maximum="100" Value="0"
+                                         Visibility="Collapsed" VerticalAlignment="Center"/>
+                            <Button x:Name="CancelBatchDelete" Grid.Column="2"
+                                    Content="Cancel" FontSize="10" Padding="6,2"
+                                    Click="OnCancelBatchDelete"
+                                    Visibility="Collapsed"
+                                    Style="{StaticResource TransparentButtonStyle}"/>
                         </Grid>
                     </Border>
                 </Grid>

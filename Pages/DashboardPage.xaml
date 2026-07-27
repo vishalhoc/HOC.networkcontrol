@@ -341,7 +341,7 @@
                             <!-- Connection uptime -->
                             <Border CornerRadius="8" Padding="10,8" Background="{ThemeResource LayerFillColorDefaultBrush}">
                                 <StackPanel Spacing="2">
-                                    <TextBlock Text="Connection Uptime" FontSize="10" Foreground="Gray"/>
+                                    <TextBlock Text="Session Uptime" FontSize="10" Foreground="Gray"/>
                                     <TextBlock x:Name="ConnUptime" Text="—" FontSize="13" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </Border>

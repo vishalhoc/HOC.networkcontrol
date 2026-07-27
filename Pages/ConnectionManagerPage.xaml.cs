@@ -337,20 +337,26 @@ public sealed partial class ConnectionManagerPage : Page
 
     private void OnBulkBlock(object sender, RoutedEventArgs e)
     {
-        var targets = ViewModel.FilteredProcesses.Where(p => p.IsSelected).ToList();
+        var targets = ViewModel.FilteredProcesses.Where(p => p.IsSelected && !p.IsBlocked).ToList();
+        if (targets.Count == 0) return;
         foreach (var p in targets)
         {
-            if (!p.IsBlocked) { p.IsBlocked = true; ViewModel.ToggleBlock(p); }
+            p.IsBlocked = true;
+            ViewModel.ToggleBlock(p);
         }
+        App.MainWindow?.ShowToast("Bulk Block", $"Blocked {targets.Count} process(es).", "success");
     }
 
     private void OnBulkUnblock(object sender, RoutedEventArgs e)
     {
-        var targets = ViewModel.FilteredProcesses.Where(p => p.IsSelected).ToList();
+        var targets = ViewModel.FilteredProcesses.Where(p => p.IsSelected && p.IsBlocked).ToList();
+        if (targets.Count == 0) return;
         foreach (var p in targets)
         {
-            if (p.IsBlocked) { p.IsBlocked = false; ViewModel.ToggleBlock(p); }
+            p.IsBlocked = false;
+            ViewModel.ToggleBlock(p);
         }
+        App.MainWindow?.ShowToast("Bulk Unblock", $"Unblocked {targets.Count} process(es).", "info");
     }
 
     // ── Process Right-Click Context Menu ─────────────────────────────────────
