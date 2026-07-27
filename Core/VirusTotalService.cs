@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -76,9 +77,12 @@ public sealed class VirusTotalService : IDisposable
 
     private readonly object _lock = new();
 
-    // Rate limiter: free VT API = 4 lookups / minute
+    // Rate limiter: free VT API = 4 lookups / minute.
+    // FIX Bug#16: Use Stopwatch.GetTimestamp() (monotonic hardware counter)
+    // instead of DateTime.UtcNow so NTP adjustments or DST changes cannot
+    // reset or skip the 60-second window, causing 429 errors or over-counting.
     private readonly SemaphoreSlim _gate          = new(1, 1);
-    private DateTime               _windowStart   = DateTime.UtcNow;
+    private long                   _windowStartTs = Stopwatch.GetTimestamp();
     private int                    _reqThisWindow;
     private const int              MaxPerMinute   = 4;
 
@@ -133,15 +137,15 @@ public sealed class VirusTotalService : IDisposable
                     return cached.ToResult();
             }
 
-            // Enforce 4 req/min window
-            var now = DateTime.UtcNow;
-            if ((now - _windowStart).TotalSeconds >= 60) { _windowStart = now; _reqThisWindow = 0; }
+            // Enforce 4 req/min window using monotonic Stopwatch timestamps.
+            double elapsedSecs = Stopwatch.GetElapsedTime(_windowStartTs).TotalSeconds;
+            if (elapsedSecs >= 60) { _windowStartTs = Stopwatch.GetTimestamp(); _reqThisWindow = 0; elapsedSecs = 0; }
             if (_reqThisWindow >= MaxPerMinute)
             {
-                double wait = 60 - (now - _windowStart).TotalSeconds;
+                double wait = 60.0 - elapsedSecs;
                 if (wait > 0) await Task.Delay(TimeSpan.FromSeconds(wait + 1));
-                _windowStart    = DateTime.UtcNow;
-                _reqThisWindow  = 0;
+                _windowStartTs = Stopwatch.GetTimestamp();
+                _reqThisWindow = 0;
             }
             _reqThisWindow++;
 

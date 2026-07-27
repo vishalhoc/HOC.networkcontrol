@@ -76,4 +76,14 @@ public class AppConfig
 
     // VirusTotal API key (free API from https://www.virustotal.com/gui/my-apikey)
     public string VirusTotalApiKey { get; set; } = string.Empty;
+
+    // Window position / size persistence (UI Imp#29)
+    // -1 means "not set" → let OS decide initial placement
+    public double WindowX      { get; set; } = -1;
+    public double WindowY      { get; set; } = -1;
+    public double WindowWidth  { get; set; } = 1280;
+    public double WindowHeight { get; set; } = 800;
+
+    // Nav pane display mode (IMP#28)
+    public string NavPaneMode { get; set; } = "left";
 }

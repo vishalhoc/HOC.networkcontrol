@@ -132,9 +132,10 @@ public sealed partial class SettingsPage : Page
 
     private void OnNavPaneChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_loaded) return;
+        if (!_loaded || _cfg == null) return;
         string tag = ((ComboBoxItem)NavPaneCombo.SelectedItem)?.Tag?.ToString() ?? "left";
-        if (App.MainWindow is MainWindow mw) mw.UpdateNavPaneMode(tag);
+        _cfg.NavPaneMode = tag; // IMP#28: persist so it's restored on next launch
+        App.MainWindow?.UpdateNavPaneMode(tag);
     }
 
     private void OnAcrylicToggled(object sender, RoutedEventArgs e)

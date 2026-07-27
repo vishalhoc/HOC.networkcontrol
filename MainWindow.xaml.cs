@@ -60,6 +60,9 @@ public sealed partial class MainWindow : Window
         // Apply saved theme
         ApplyTheme(ViewModel.CurrentConfig.AppTheme);
 
+        // Restore saved window size and position (Imp#29)
+        RestoreWindowBounds();
+
         // Wire up live speed header ticker
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
@@ -86,8 +89,49 @@ public sealed partial class MainWindow : Window
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
+        // Save window bounds before anything else disposes (Imp#29)
+        SaveWindowBounds();
         try { ViewModel.ProxyService.Stop(); } catch { }
         try { _tray?.Dispose(); _tray = null; } catch { }
+    }
+
+    // ── Window bounds persistence (Imp#29) ────────────────────────────────────
+    private void RestoreWindowBounds()
+    {
+        try
+        {
+            var cfg = ViewModel.CurrentConfig;
+            if (cfg.WindowX < 0 || cfg.WindowY < 0) return; // first launch — let OS decide
+
+            var appWin = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
+                Microsoft.UI.Win32Interop.GetWindowIdFromWindow(
+                    WinRT.Interop.WindowNative.GetWindowHandle(this)));
+
+            appWin.MoveAndResize(new Windows.Graphics.RectInt32(
+                (int)cfg.WindowX, (int)cfg.WindowY,
+                (int)Math.Max(cfg.WindowWidth,  640),
+                (int)Math.Max(cfg.WindowHeight, 480)));
+        }
+        catch { /* non-fatal — window opens at default position */ }
+    }
+
+    private void SaveWindowBounds()
+    {
+        try
+        {
+            var appWin = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
+                Microsoft.UI.Win32Interop.GetWindowIdFromWindow(
+                    WinRT.Interop.WindowNative.GetWindowHandle(this)));
+
+            var pos  = appWin.Position;
+            var size = appWin.Size;
+            ViewModel.CurrentConfig.WindowX      = pos.X;
+            ViewModel.CurrentConfig.WindowY      = pos.Y;
+            ViewModel.CurrentConfig.WindowWidth  = size.Width;
+            ViewModel.CurrentConfig.WindowHeight = size.Height;
+            ViewModel.SaveConfig();
+        }
+        catch { }
     }
 
     // ── NavigationView events ──────────────────────────────────────────────────
@@ -102,6 +146,9 @@ public sealed partial class MainWindow : Window
         // The pane panel does not exist in the visual tree until Loaded fires,
         // so any PaneBackground set before this point has no effect.
         UpdateNavViewTheme(_currentTheme);
+
+        // IMP#28: Restore saved nav pane mode (left / compact / top)
+        UpdateNavPaneMode(ViewModel.CurrentConfig.NavPaneMode);
     }
 
     /// <summary>Updates the NavigationView pane mode from Settings.</summary>
