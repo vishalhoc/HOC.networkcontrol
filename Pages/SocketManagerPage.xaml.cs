@@ -31,7 +31,7 @@ public partial class SocketRow : CommunityToolkit.Mvvm.ComponentModel.Observable
     public int    RemotePort    { get; set; }
 
     [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
-    private Microsoft.UI.Xaml.Media.ImageSource? _appIcon;
+    public partial Microsoft.UI.Xaml.Media.ImageSource? AppIcon { get; set; }
 
     public string AppIconGlyph => ProcessName.ToLowerInvariant() switch
     {
@@ -44,7 +44,7 @@ public partial class SocketRow : CommunityToolkit.Mvvm.ComponentModel.Observable
 
     [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
     [CommunityToolkit.Mvvm.ComponentModel.NotifyPropertyChangedFor(nameof(ActionBrush), nameof(BlockBorderBrush), nameof(BlockIcon), nameof(BlockToolTip))]
-    private bool _isBlocked;
+    public partial bool IsBlocked { get; set; }
 
     public SolidColorBrush ProtoBrush => Proto == "UDP"
         ? new SolidColorBrush(Microsoft.UI.Colors.Orange)

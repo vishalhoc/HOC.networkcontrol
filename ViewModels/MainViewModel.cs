@@ -155,24 +155,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     // ── Observable properties ─────────────────────────────────────────────────
-    [ObservableProperty] private ObservableCollection<NetworkAdapterInfo> _networkAdapters = new();
-    [ObservableProperty] private double _globalUploadSpeed;
-    [ObservableProperty] private double _globalDownloadSpeed;
-    [ObservableProperty] private long _globalTotalSent;
-    [ObservableProperty] private Type? _currentPageType;
+    [ObservableProperty] public partial ObservableCollection<NetworkAdapterInfo> NetworkAdapters    { get; set; } = new();
+    [ObservableProperty] public partial double GlobalUploadSpeed                                    { get; set; }
+    [ObservableProperty] public partial double GlobalDownloadSpeed  { get; set; }
+    [ObservableProperty] public partial long   GlobalTotalSent      { get; set; }
+    [ObservableProperty] public partial Type?  CurrentPageType      { get; set; }
 
     // Payload for passing IP to PacketJourneyPage
-    [ObservableProperty] private string _targetPacketJourneyIp = "";
+    [ObservableProperty] public partial string TargetPacketJourneyIp { get; set; } = "";
 
-    [ObservableProperty] private long _globalTotalReceived; // bytes downloaded this session
+    [ObservableProperty] public partial long GlobalTotalReceived { get; set; } // bytes downloaded this session
 
     // Pre-formatted stats bar strings
-    public string GlobalUploadText       => FormatSpeed(GlobalUploadSpeed);
-    public string GlobalDownloadText     => FormatSpeed(GlobalDownloadSpeed);
-    public string GlobalTotalText        => FormatSize(GlobalTotalDataUsed);
-    public string GlobalTotalSentText    => FormatSize(GlobalTotalSent);
+    public string GlobalUploadText        => FormatSpeed(GlobalUploadSpeed);
+    public string GlobalDownloadText      => FormatSpeed(GlobalDownloadSpeed);
+    public string GlobalTotalText         => FormatSize(GlobalTotalDataUsed);
+    public string GlobalTotalSentText     => FormatSize(GlobalTotalSent);
     public string GlobalTotalReceivedText => FormatSize(GlobalTotalReceived);
-    public string BlockedCountText       => $"{Processes.Count(p => p.IsBlocked)} blocked";
+    public string BlockedCountText        => $"{Processes.Count(p => p.IsBlocked)} blocked";
 
     partial void OnGlobalUploadSpeedChanged(double value)    => OnPropertyChanged(nameof(GlobalUploadText));
     partial void OnGlobalDownloadSpeedChanged(double value)  => OnPropertyChanged(nameof(GlobalDownloadText));
@@ -181,7 +181,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnGlobalTotalReceivedChanged(long value)    => OnPropertyChanged(nameof(GlobalTotalReceivedText));
 
     // Last-refreshed indicator — updated at the end of every OnConnectionsUpdated tick
-    [ObservableProperty] private DateTime _lastRefreshed = DateTime.Now;
+    [ObservableProperty] public partial DateTime LastRefreshed { get; set; } = DateTime.Now;
     public string LastRefreshedText
     {
         get
@@ -212,12 +212,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
     }
 
-    [ObservableProperty] private ObservableCollection<ProcessNetworkInfo> _processes = new();
-    [ObservableProperty] private ObservableCollection<ProcessNetworkInfo> _filteredProcesses = new();
-    [ObservableProperty] private long _globalTotalDataUsed;
+    [ObservableProperty] public partial ObservableCollection<ProcessNetworkInfo> Processes         { get; set; } = new();
+    [ObservableProperty] public partial ObservableCollection<ProcessNetworkInfo> FilteredProcesses { get; set; } = new();
+    [ObservableProperty] public partial long GlobalTotalDataUsed { get; set; }
 
     /// <summary>Top 5 apps by total data used — updated each refresh cycle (#12).</summary>
-    [ObservableProperty] private ObservableCollection<ProcessNetworkInfo> _topConsumers = new();
+    [ObservableProperty] public partial ObservableCollection<ProcessNetworkInfo> TopConsumers { get; set; } = new();
 
     private string _searchText = string.Empty;
     public string SearchText

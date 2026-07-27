@@ -5,24 +5,24 @@ namespace WinNetControl.Models;
 
 public partial class ProcessConnection : ObservableObject
 {
-    [ObservableProperty] private string _protocol     = string.Empty;
-    [ObservableProperty] private string _localAddress = string.Empty;
-    [ObservableProperty] private int    _localPort;
-    [ObservableProperty] private string _remoteAddress = string.Empty;
-    [ObservableProperty] private int    _remotePort;
-    [ObservableProperty] private string _state = string.Empty;
-    [ObservableProperty] private bool   _isBlocked;
-    [ObservableProperty] private int    _processId;
-    [ObservableProperty] private System.DateTime _lastActiveTime = System.DateTime.Now;
-    [ObservableProperty] private bool   _isActive = true;
-    [ObservableProperty] private bool   _isPinned;
+    [ObservableProperty] public partial string Protocol      { get; set; } = string.Empty;
+    [ObservableProperty] public partial string LocalAddress  { get; set; } = string.Empty;
+    [ObservableProperty] public partial int    LocalPort     { get; set; }
+    [ObservableProperty] public partial string RemoteAddress { get; set; } = string.Empty;
+    [ObservableProperty] public partial int    RemotePort    { get; set; }
+    [ObservableProperty] public partial string State         { get; set; } = string.Empty;
+    [ObservableProperty] public partial bool   IsBlocked     { get; set; }
+    [ObservableProperty] public partial int             ProcessId      { get; set; }
+    [ObservableProperty] public partial System.DateTime LastActiveTime { get; set; } = System.DateTime.Now;
+    [ObservableProperty] public partial bool             IsActive       { get; set; } = true;
+    [ObservableProperty] public partial bool             IsPinned       { get; set; }
 
     // Direction-aware blocking
-    [ObservableProperty] private bool _blockInbound;
-    [ObservableProperty] private bool _blockOutbound;
+    [ObservableProperty] public partial bool   BlockInbound  { get; set; }
+    [ObservableProperty] public partial bool   BlockOutbound { get; set; }
 
     // Geo-IP country label (#18) — e.g. "🇺🇸 US"
-    [ObservableProperty] private string _geoCountry = string.Empty;
+    [ObservableProperty] public partial string GeoCountry    { get; set; } = string.Empty;
 
     // Is this a listening / inbound connection (no remote address)
     public bool IsInbound => string.IsNullOrWhiteSpace(RemoteAddress)
@@ -83,11 +83,11 @@ public partial class ProcessConnection : ObservableObject
 
 public partial class ProcessNetworkInfo : ObservableObject
 {
-    [ObservableProperty] private int    _processId;
-    [ObservableProperty] private string _processName = string.Empty;
-    [ObservableProperty] private string _processPath = string.Empty;
-    [ObservableProperty] private string _appType     = string.Empty;
-    [ObservableProperty] private Microsoft.UI.Xaml.Media.ImageSource? _appIcon;
+    [ObservableProperty] public partial int    ProcessId   { get; set; }
+    [ObservableProperty] public partial string ProcessName { get; set; } = string.Empty;
+    [ObservableProperty] public partial string ProcessPath { get; set; } = string.Empty;
+    [ObservableProperty] public partial string                                    AppType { get; set; } = string.Empty;
+    [ObservableProperty] public partial Microsoft.UI.Xaml.Media.ImageSource?     AppIcon { get; set; }
 
     // Used beneath the extracted executable icon, and remains visible for
     // protected Windows processes or offline entries that have no file path.
@@ -101,7 +101,7 @@ public partial class ProcessNetworkInfo : ObservableObject
     };
 
     // Is this a phantom (offline / not currently running) entry kept for blocked-app display?
-    [ObservableProperty] private bool _isPhantom;
+    [ObservableProperty] public partial bool IsPhantom { get; set; }
 
     private bool _isBlocked;
     public  bool IsBlocked   { get => _isBlocked;   set => SetProperty(ref _isBlocked, value); }
@@ -403,16 +403,16 @@ public partial class ProcessNetworkInfo : ObservableObject
 
 public partial class HttpRequestInfo : ObservableObject
 {
-    [ObservableProperty] private System.Guid   _id;
-    [ObservableProperty] private string _url         = string.Empty;
-    [ObservableProperty] private string _method      = string.Empty;
-    [ObservableProperty] private string _host        = string.Empty;
-    [ObservableProperty] private int    _processId;
-    [ObservableProperty] private string _processName = string.Empty;
-    [ObservableProperty] private System.DateTime _timestamp = System.DateTime.Now;
-    [ObservableProperty] private int    _statusCode;
-    [ObservableProperty] private string _contentType = string.Empty;
-    [ObservableProperty] private long   _responseSize;
+    [ObservableProperty] public partial System.Guid   Id     { get; set; }
+    [ObservableProperty] public partial string         Url    { get; set; } = string.Empty;
+    [ObservableProperty] public partial string         Method { get; set; } = string.Empty;
+    [ObservableProperty] public partial string          Host        { get; set; } = string.Empty;
+    [ObservableProperty] public partial int             ProcessId   { get; set; }
+    [ObservableProperty] public partial string          ProcessName { get; set; } = string.Empty;
+    [ObservableProperty] public partial System.DateTime Timestamp   { get; set; } = System.DateTime.Now;
+    [ObservableProperty] public partial int             StatusCode  { get; set; }
+    [ObservableProperty] public partial string ContentType  { get; set; } = string.Empty;
+    [ObservableProperty] public partial long   ResponseSize { get; set; }
 
     /// <summary>"200 OK", "404 Not Found" etc., empty if not yet received.</summary>
     public string StatusText => StatusCode > 0 ? $"{StatusCode}" : "—";
@@ -456,8 +456,8 @@ public partial class HttpRequestInfo : ObservableObject
 
 public partial class NetworkAdapterInfo : ObservableObject
 {
-    [ObservableProperty] private string _name = string.Empty;
-    [ObservableProperty] private int    _interfaceIndex;
+    [ObservableProperty] public partial string Name            { get; set; } = string.Empty;
+    [ObservableProperty] public partial int    InterfaceIndex  { get; set; }
 
     private bool _isSelected;
     public  bool IsSelected

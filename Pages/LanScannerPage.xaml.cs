@@ -28,43 +28,43 @@ public partial class LanDevice : ObservableObject
     public string Mac       { get; set; } = "—";
     public string OpenPorts { get; set; } = "";
 
-    [ObservableProperty] private string _hostname = "—";
+    [ObservableProperty] public partial string Hostname { get; set; } = "—";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PingBrush))]
-    private long _pingRaw;
-    [ObservableProperty] private string _pingMs = "";
+    public partial long PingRaw { get; set; }
+    [ObservableProperty] public partial string PingMs { get; set; } = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AccessText), nameof(AccessIcon), nameof(AccessBrush))]
-    private bool _isBlocked;
+    public partial bool IsBlocked { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(InternetText), nameof(InternetIcon), nameof(InternetBrush))]
-    private bool _isInternetCut;
+    public partial bool IsInternetCut { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OsGuess), nameof(OsIcon), nameof(TypeVendorText))]
-    private string _deviceType = "Unknown";
+    public partial string DeviceType { get; set; } = "Unknown";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TypeVendorText), nameof(VendorVisibility))]
-    private string _vendor = "";
+    public partial string Vendor { get; set; } = "";
 
-    [ObservableProperty] private string _model = "";
-    [ObservableProperty] private string _discoverySource = "ARP / Ping";
+    [ObservableProperty] public partial string Model           { get; set; } = "";
+    [ObservableProperty] public partial string DiscoverySource { get; set; } = "ARP / Ping";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OsGuess), nameof(OsIcon))]
-    private int _ttl;
+    public partial int Ttl { get; set; }
 
     /// <summary>Icon set by OUI / DeviceFingerprinter (overrides TTL-based icon).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OsIcon))]
-    private string _fingerprintIcon = "";
+    public partial string FingerprintIcon { get; set; } = "";
 
     /// <summary>Device type label set by OUI / DeviceFingerprinter (overrides TTL-based label).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OsGuess), nameof(TypeVendorText))]
-    private string _fingerprintType = "";
+    public partial string FingerprintType { get; set; } = "";
 
     // ── Computed ─────────────────────────────────────────────────────────────
     public SolidColorBrush PingBrush => new(PingRaw < 0
@@ -222,7 +222,10 @@ public sealed partial class LanScannerPage : Page
             });
             SubnetBox.Text = $"{net[0]}.{net[1]}.{net[2]}.{net[3]}/{cidr}";
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DispatcherQueue.TryEnqueue(() => ScanStatusText.Text = $"Subnet detect: {ex.Message}");
+        }
     }
 
     // ── Auto-refresh ─────────────────────────────────────────────────────────
@@ -268,7 +271,12 @@ public sealed partial class LanScannerPage : Page
                     DispatcherQueue.TryEnqueue(() => { dev.PingMs = "timeout"; dev.PingRaw = -1; });
                 }
             }
-            catch { }
+            catch (Exception pingEx) when (pingEx is System.Net.NetworkInformation.PingException
+                                        || pingEx is OperationCanceledException
+                                        || pingEx is System.IO.IOException)
+            {
+                DispatcherQueue.TryEnqueue(() => { dev.PingMs = "err"; dev.PingRaw = -1; });
+            }
         }));
         DispatcherQueue.TryEnqueue(() => ScanStatusText.Text = $"Refreshed {snapshot.Count} devices.");
     }
@@ -466,7 +474,10 @@ public sealed partial class LanScannerPage : Page
                 result.Add($"{(ip >> 24) & 0xFF}.{(ip >> 16) & 0xFF}.{(ip >> 8) & 0xFF}.{ip & 0xFF}");
             }
         }
-        catch { }
+        catch (Exception)
+        {
+            // Return whatever addresses were parsed before the error
+        }
         return result;
     }
 
@@ -492,7 +503,12 @@ public sealed partial class LanScannerPage : Page
                 if (await Task.WhenAny(conn, Task.Delay(timeout)) == conn && !conn.IsFaulted)
                     open.Add(port);
             }
-            catch { }
+            catch (Exception portEx) when (portEx is System.Net.Sockets.SocketException
+                                        || portEx is OperationCanceledException
+                                        || portEx is TimeoutException)
+            {
+                // Port closed or filtered — expected, not an error
+            }
         });
         await Task.WhenAll(tasks);
         return open.Any() ? string.Join(", ", open.OrderBy(p => p)) : "—";
