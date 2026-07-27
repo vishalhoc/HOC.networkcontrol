@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
 using WinNetControl.ViewModels;
@@ -108,6 +108,9 @@ public sealed partial class MainWindow : Window
         SaveWindowBounds();
         try { ViewModel.ProxyService.Stop(); } catch { }
         try { _tray?.Dispose(); _tray = null; } catch { }
+        try { _headerDebounce?.Dispose(); } catch { }
+        // Imp#24: cancel all background work in the ViewModel
+        try { ViewModel.Dispose(); } catch { }
     }
 
     // ── Window bounds persistence (Imp#29) ────────────────────────────────────

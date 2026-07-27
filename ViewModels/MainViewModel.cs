@@ -8,13 +8,17 @@ using WinNetControl.Models;
 
 namespace WinNetControl.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly NetworkMonitorService _networkMonitor;
     private readonly NetworkSpeedMonitorService _speedMonitor;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
     private readonly VirusTotalService _vtService = new();
     private int _speedSortTickCount; // throttles speed-based re-sorts to every ~4.5 s
+
+    // Imp#24: app-wide cancellation — cancelled in Dispose() on window close
+    private readonly System.Threading.CancellationTokenSource _appCts = new();
+    public System.Threading.CancellationToken AppToken => _appCts.Token;
 
     // FIX Bug#18: keep a hard reference so the timer is not garbage-collected
     // immediately (local 'var' in the constructor was eligible for GC at the
@@ -1261,5 +1265,19 @@ public partial class MainViewModel : ObservableObject
             if (!string.IsNullOrEmpty(label))
                 _dispatcherQueue?.TryEnqueue(() => conn.GeoCountry = label);
         });
+    }
+
+    // Imp#24: cancel background work and release resources on app exit
+    public void Dispose()
+    {
+        try
+        {
+            _speedMonitor.OnSpeedUpdated -= OnSpeedUpdated;
+            _networkMonitor.OnConnectionsUpdated -= OnConnectionsUpdated;
+        }
+        catch { /* handlers may already be detached */ }
+
+        _appCts.Cancel();
+        _appCts.Dispose();
     }
 }

@@ -43,6 +43,11 @@ public sealed partial class FirewallPage : Page
     private readonly DispatcherTimer _searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private List<FirewallRuleItem> _sortedRules = new();
 
+    // Imp#10: pagination
+    private List<FirewallRuleItem> _matchedRules = new();
+    private int _currentPage = 0;
+    private const int PageSize = 100;
+
     // IMP#6: tracks an in-flight batch delete so it can be cancelled
     private System.Threading.CancellationTokenSource? _batchDeleteCts;
 
@@ -140,11 +145,39 @@ public sealed partial class FirewallPage : Page
 
     private void ApplySearch(string query)
     {
-        _filtered.Clear();
         var q = query.Trim().ToLowerInvariant();
-        foreach (var r in _sortedRules)
-            if (q.Length == 0 || r.Name.ToLowerInvariant().Contains(q))
-                _filtered.Add(r);
+        _matchedRules = q.Length == 0
+            ? _sortedRules
+            : _sortedRules.Where(r => r.Name.ToLowerInvariant().Contains(q)).ToList();
+        _currentPage = 0;
+        RenderPage();
+    }
+
+    // Imp#10: slice the matched list into the visible _filtered collection
+    private void RenderPage()
+    {
+        int totalPages = Math.Max(1, (_matchedRules.Count + PageSize - 1) / PageSize);
+        int start = _currentPage * PageSize;
+        int end   = Math.Min(start + PageSize, _matchedRules.Count);
+
+        _filtered.Clear();
+        for (int i = start; i < end; i++) _filtered.Add(_matchedRules[i]);
+
+        // Update pager controls
+        PagerLabel.Text       = $"Page {_currentPage + 1} of {totalPages}  ({_matchedRules.Count} rules)";
+        PagerPrev.IsEnabled   = _currentPage > 0;
+        PagerNext.IsEnabled   = _currentPage < totalPages - 1;
+    }
+
+    private void OnPagerPrev(object sender, RoutedEventArgs e)
+    {
+        if (_currentPage > 0) { _currentPage--; RenderPage(); }
+    }
+
+    private void OnPagerNext(object sender, RoutedEventArgs e)
+    {
+        int totalPages = Math.Max(1, (_matchedRules.Count + PageSize - 1) / PageSize);
+        if (_currentPage < totalPages - 1) { _currentPage++; RenderPage(); }
     }
 
     // IMP#9: debounced search — reset timer on each keystroke
@@ -221,6 +254,13 @@ public sealed partial class FirewallPage : Page
 
         string args = $"advfirewall firewall add rule name=\"{name}\" dir={dir} action=block {ipPart}{portPart}{progPart}enable=yes";
 
+        // Imp#23: check before adding to avoid silent duplicate rules
+        if (await Task.Run(() => WinNetControl.Core.FirewallService.RuleExists(name)))
+        {
+            RuleStatus.Text = $"Rule '{name}' already exists — delete it first or choose a different name.";
+            return;
+        }
+
         RuleStatus.Text = "Adding rule…";
         await RunElevatedAsync("netsh", args);
         RuleStatus.Text = $"Rule '{name}' added.";
@@ -240,6 +280,15 @@ public sealed partial class FirewallPage : Page
         // dots → dashes for IPv4) so the rule name is always valid in netsh.
         string safeIp = ip.Replace(':', '-').Replace('.', '-');
         string ruleName = $"WinNetControl_ConnOut_QuickIp_{safeIp}";
+
+        // Imp#23: skip if this IP is already blocked
+        if (await Task.Run(() => WinNetControl.Core.FirewallService.RuleExists(ruleName)))
+        {
+            RuleStatus.Text = $"{ip} is already blocked.";
+            QuickBlockIpBox.Text = string.Empty;
+            return;
+        }
+
         RuleStatus.Text = $"Blocking {ip}…";
         await RunElevatedAsync("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=out action=block remoteip=\"{ip}\" enable=yes");
         // FIX Bug#11: clear the input AFTER the command succeeds, not before
