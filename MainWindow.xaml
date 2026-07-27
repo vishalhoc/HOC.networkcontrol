@@ -491,5 +491,18 @@
             <Frame x:Name="ContentFrame" NavigationFailed="ContentFrame_NavigationFailed"/>
 
         </NavigationView>
+
+        <!-- IMP#26: App-wide toast notification overlay -->
+        <!-- Floats above NavView; auto-dismissed after a few seconds.
+             Being the last child in RootGrid ensures it renders on top. -->
+        <InfoBar x:Name="AppToast"
+                 IsOpen="False"
+                 IsClosable="True"
+                 VerticalAlignment="Bottom"
+                 HorizontalAlignment="Right"
+                 Margin="0,0,20,20"
+                 MinWidth="280"
+                 MaxWidth="420"
+                 CornerRadius="10"/>
     </Grid>
 </Window>

@@ -382,6 +382,14 @@ public sealed partial class DashboardPage : Page
                         _pingHistory.RemoveAt(0);
 
                     PingMs.Text = $"{ms} ms";
+
+                    // IMP#30: color-coded quality ring — green/yellow/red based on latency
+                    PingMs.Foreground = ms < 50
+                        ? new SolidColorBrush(Color.FromArgb(255, 16, 185, 90))   // green — excellent
+                        : ms < 150
+                            ? new SolidColorBrush(Color.FromArgb(255, 251, 188, 5))  // yellow — fair
+                            : new SolidColorBrush(Color.FromArgb(255, 220, 38, 38)); // red — poor
+
                     PingStatusText.Text = ms < 50 ? "Excellent" : ms < 100 ? "Good" : ms < 200 ? "Fair" : "Poor";
                     PacketLoss.Text = "0%";  // reset on success
 
@@ -492,6 +500,17 @@ public sealed partial class DashboardPage : Page
     {
         _ = LoadNetworkInfoAsync();
         OnStatsTick(null, null!);
+    }
+
+    // ── IMP#2: Reset Peaks ────────────────────────────────────────────────────
+    private void OnResetPeaks(object sender, RoutedEventArgs e)
+    {
+        _peakUpload   = 0;
+        _peakDownload = 0;
+        CardUploadPeak.Text   = "Peak: 0 B/s";
+        CardDownloadPeak.Text = "Peak: 0 B/s";
+        UploadBar.Value   = 0;
+        DownloadBar.Value = 0;
     }
 
     // ── IMP#29: Copy-to-clipboard handlers ────────────────────────────────────

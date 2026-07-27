@@ -324,6 +324,35 @@ public sealed partial class MainWindow : Window
         ViewModel.SaveConfig();
     }
 
+    // ── IMP#26: App-wide toast notification ───────────────────────────────────
+    /// <summary>
+    /// Shows a floating InfoBar toast that auto-dismisses after <paramref name="durationMs"/> ms.
+    /// Call from any page via <c>App.MainWindow.ShowToast(...)</c>.
+    /// </summary>
+    /// <param name="title">Bold title line.</param>
+    /// <param name="message">Descriptive body text.</param>
+    /// <param name="severity">"success" | "warning" | "error" | "info"</param>
+    /// <param name="durationMs">Auto-close delay (default 3 s).</param>
+    public async void ShowToast(string title, string message,
+                                string severity = "info", int durationMs = 3000)
+    {
+        AppToast.Severity = severity.ToLowerInvariant() switch
+        {
+            "success" => Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success,
+            "warning" => Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
+            "error"   => Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error,
+            _         => Microsoft.UI.Xaml.Controls.InfoBarSeverity.Informational
+        };
+        AppToast.Title   = title;
+        AppToast.Message = message;
+        AppToast.IsOpen  = true;
+
+        await System.Threading.Tasks.Task.Delay(durationMs);
+
+        // Only close if still showing this toast (user may have closed it already)
+        if (AppToast.IsOpen) AppToast.IsOpen = false;
+    }
+
     /// <summary>
     /// Explicitly updates the NavigationView pane background and RequestedTheme.
     /// WinUI 3's NavigationView.PaneBackground does not re-resolve ThemeResources at

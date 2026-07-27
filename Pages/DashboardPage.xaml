@@ -68,7 +68,18 @@
                             <TextBlock Text="Upload" VerticalAlignment="Center" FontSize="12" Foreground="Gray"/>
                         </StackPanel>
                         <TextBlock x:Name="CardUpload" Text="0 B/s" FontSize="22" FontWeight="Bold" Foreground="#0078D4"/>
-                        <TextBlock x:Name="CardUploadPeak" Text="Peak: 0 B/s" FontSize="10" Foreground="Gray"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="CardUploadPeak" Text="Peak: 0 B/s" FontSize="10" Foreground="Gray" VerticalAlignment="Center"/>
+                            <!-- IMP#2: Reset Peaks button -->
+                            <Button Grid.Column="1" Content="Reset" Click="OnResetPeaks"
+                                    FontSize="9" Padding="6,2" Margin="4,0,0,0"
+                                    Style="{StaticResource TransparentButtonStyle}"
+                                    ToolTipService.ToolTip="Reset upload and download peak values"/>
+                        </Grid>
                         <!-- Mini sparkline bar -->
                         <ProgressBar x:Name="UploadBar" Maximum="100" Value="0" Height="4" CornerRadius="2"
                                      Foreground="#0078D4" Background="#1A0078D4"/>
