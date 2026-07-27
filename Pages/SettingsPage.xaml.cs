@@ -113,6 +113,10 @@ public sealed partial class SettingsPage : Page
         if (VtApiKeyBox != null)
             VtApiKeyBox.Password = _cfg?.VirusTotalApiKey ?? string.Empty;
 
+        // VT cache TTL (Imp#11)
+        if (VtCacheTtlBox != null)
+            VtCacheTtlBox.Value = _cfg?.VtCacheTtlDays ?? 30;
+
         _loaded = true;
     }
 
@@ -653,5 +657,27 @@ public sealed partial class SettingsPage : Page
                 "https://www.virustotal.com/gui/my-apikey") { UseShellExecute = true });
         }
         catch { }
+    }
+
+    // ── IMP#11: VT cache management ──────────────────────────────────────────
+    /// <summary>
+    /// Clears the VirusTotal scan cache so all files will be re-scanned next time.
+    /// Wipes both in-memory and on-disk cache (vt_cache.json in LocalAppData).
+    /// </summary>
+    private void OnClearVtCache(object sender, RoutedEventArgs e)
+    {
+        _vm?.ClearVtCache();
+        DataStatus.Text = $"✓ VT cache cleared — {DateTime.Now:HH:mm:ss}. All files will be re-scanned on next check.";
+    }
+
+    /// <summary>
+    /// Persists the VT cache TTL slider/numberbox value to ViewModel + config.
+    /// </summary>
+    private void OnVtCacheTtlChanged(object sender, NumberBoxValueChangedEventArgs e)
+    {
+        if (!_loaded || _vm == null) return;
+        int days = (int)(double.IsNaN(e.NewValue) ? 30 : Math.Clamp(e.NewValue, 1, 365));
+        _vm.VtCacheTtlDays = days;
+        _vm.SaveConfig();
     }
 }

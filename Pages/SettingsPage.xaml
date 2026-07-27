@@ -400,6 +400,30 @@
                                     Click="OnOpenVtSite" VerticalAlignment="Center"
                                     ToolTipService.ToolTip="Opens virustotal.com in your browser"/>
                         </Grid>
+
+                        <!-- VT Cache TTL + Clear button (Imp#11) -->
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="VT Cache Lifetime" FontSize="12" FontWeight="SemiBold"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="Gray"
+                                           Text="Days before a cached scan expires (1–365)"/>
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" x:Name="VtCacheTtlBox"
+                                       Minimum="1" Maximum="365" Value="30"
+                                       SpinButtonPlacementMode="Inline"
+                                       SmallChange="1" LargeChange="10"
+                                       VerticalAlignment="Center"
+                                       ValueChanged="OnVtCacheTtlChanged"
+                                       ToolTipService.ToolTip="Set to 1 for daily re-scans, 365 to cache for a year"/>
+                            <Button Grid.Column="2" Content="Clear Cache"
+                                    Click="OnClearVtCache" VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="Wipe all cached VT results — next scan will hit the API"/>
+                        </Grid>
                     </StackPanel>
                 </Border>
 

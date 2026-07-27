@@ -63,6 +63,11 @@ public sealed partial class SparklineControl : UserControl
 
         ActualThemeChanged += (_, __) => { ApplyThemeColors(0); Redraw(); };
         Loaded             += (_, __) => { ApplyThemeColors(0); Redraw(); };
+
+        // IMP#19 / Bug#26: trigger Redraw when the canvas gets a real size for
+        // the first time. Without this the graph stays blank until the next ETW
+        // data tick because ActualWidth/Height are 0 at construction time.
+        SizeChanged += (_, __) => Redraw();
     }
 
     // ── Theme / colour ─────────────────────────────────────────────────────────

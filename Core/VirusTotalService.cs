@@ -61,8 +61,14 @@ public sealed class VirusTotalService : IDisposable
 {
     private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(20) };
 
-    // Cache expires after 30 days (free tier quota matters)
-    private static readonly TimeSpan CacheMaxAge = TimeSpan.FromDays(30);
+    // IMP#11: Cache lifetime is now configurable (set from AppConfig.VtCacheTtlDays).
+    // Default 30 days. Setting to 0 disables the cache entirely.
+    private TimeSpan _cacheTtl = TimeSpan.FromDays(30);
+    public TimeSpan CacheTtl
+    {
+        get => _cacheTtl;
+        set => _cacheTtl = value.TotalDays > 0 ? value : TimeSpan.FromDays(30);
+    }
 
     // ── Disk cache paths ──────────────────────────────────────────────────────
     private static readonly string CacheDir = Path.Combine(
@@ -88,6 +94,21 @@ public sealed class VirusTotalService : IDisposable
 
     public VirusTotalService() => LoadCache();
 
+    // ── Imp#11: Clear VT cache on demand ─────────────────────────────────────
+    /// <summary>
+    /// Clears both the in-memory and on-disk VT cache so all files will be
+    /// re-scanned on the next VirusTotal check. Called from Settings UI.
+    /// </summary>
+    public void ClearCache()
+    {
+        lock (_lock)
+        {
+            _hashCache.Clear();
+            _pathToHash.Clear();
+        }
+        try { if (File.Exists(CacheFile)) File.Delete(CacheFile); } catch { }
+    }
+
     // ── Public: instant cached result by file path (no API call) ─────────────
     public VtResult? TryGetCachedByPath(string filePath)
     {
@@ -96,7 +117,7 @@ public sealed class VirusTotalService : IDisposable
         {
             if (!_pathToHash.TryGetValue(filePath, out string? hash)) return null;
             if (!_hashCache.TryGetValue(hash, out var entry)) return null;
-            if (DateTime.UtcNow - entry.ScannedAt > CacheMaxAge) return null; // expired
+            if (_cacheTtl.TotalDays > 0 && DateTime.UtcNow - entry.ScannedAt > _cacheTtl) return null; // expired
             return entry.ToResult();
         }
     }
@@ -121,7 +142,7 @@ public sealed class VirusTotalService : IDisposable
             _pathToHash[filePath] = hash;
 
             if (_hashCache.TryGetValue(hash, out var cached) &&
-                DateTime.UtcNow - cached.ScannedAt <= CacheMaxAge)
+                (_cacheTtl.TotalDays <= 0 || DateTime.UtcNow - cached.ScannedAt <= _cacheTtl))
                 return cached.ToResult();
         }
 
@@ -133,7 +154,7 @@ public sealed class VirusTotalService : IDisposable
             lock (_lock)
             {
                 if (_hashCache.TryGetValue(hash, out var cached) &&
-                    DateTime.UtcNow - cached.ScannedAt <= CacheMaxAge)
+                    (_cacheTtl.TotalDays <= 0 || DateTime.UtcNow - cached.ScannedAt <= _cacheTtl))
                     return cached.ToResult();
             }
 
@@ -247,10 +268,10 @@ public sealed class VirusTotalService : IDisposable
                 _hashCache  = data.HashCache  ?? new(StringComparer.OrdinalIgnoreCase);
                 _pathToHash = data.PathToHash ?? new(StringComparer.OrdinalIgnoreCase);
 
-                // Purge expired entries on load
+                // Purge expired entries on load using current TTL
                 var expiredHashes = new List<string>();
                 foreach (var kvp in _hashCache)
-                    if (DateTime.UtcNow - kvp.Value.ScannedAt > CacheMaxAge)
+                    if (_cacheTtl.TotalDays > 0 && DateTime.UtcNow - kvp.Value.ScannedAt > _cacheTtl)
                         expiredHashes.Add(kvp.Key);
                 foreach (var h in expiredHashes) _hashCache.Remove(h);
             }

@@ -77,6 +77,11 @@ public class AppConfig
     // VirusTotal API key (free API from https://www.virustotal.com/gui/my-apikey)
     public string VirusTotalApiKey { get; set; } = string.Empty;
 
+    // VT cache lifetime in days. 0 = cache disabled. (Imp#11)
+    // Default: 30 days — VT definitions update daily but re-scanning every
+    // month is a good balance between accuracy and free-tier quota usage.
+    public int VtCacheTtlDays { get; set; } = 30;
+
     // Window position / size persistence (UI Imp#29)
     // -1 means "not set" → let OS decide initial placement
     public double WindowX      { get; set; } = -1;

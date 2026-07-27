@@ -86,6 +86,10 @@ public partial class MainViewModel : ObservableObject
         {
             _dispatcherQueue?.TryEnqueue(() => OnPropertyChanged(nameof(SessionDuration)));
         }, null, 1000, 1000);
+
+        // IMP#11: Apply saved VT cache TTL from config
+        if (CurrentConfig.VtCacheTtlDays > 0)
+            _vtService.CacheTtl = TimeSpan.FromDays(CurrentConfig.VtCacheTtlDays);
     }
 
     // ── Startup phantom entries ───────────────────────────────────────────────
@@ -1075,6 +1079,31 @@ public partial class MainViewModel : ObservableObject
             }
         }
     }
+
+    /// <summary>
+    /// VT cache TTL in days (Imp#11). Changing this updates the live service
+    /// and persists to config so the next launch loads the user preference.
+    /// </summary>
+    public int VtCacheTtlDays
+    {
+        get => CurrentConfig?.VtCacheTtlDays ?? 30;
+        set
+        {
+            int days = Math.Max(1, Math.Min(365, value));
+            if (CurrentConfig != null)
+            {
+                CurrentConfig.VtCacheTtlDays = days;
+                _vtService.CacheTtl = TimeSpan.FromDays(days);
+                OnPropertyChanged(nameof(VtCacheTtlDays));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Wipes the in-memory and on-disk VT cache. All files will be re-scanned
+    /// on the next VirusTotal check. Called from the Settings "Clear Cache" button.
+    /// </summary>
+    public void ClearVtCache() => _vtService.ClearCache();
 
     /// <summary>
     /// Kicks off a VirusTotal scan for the given process.
