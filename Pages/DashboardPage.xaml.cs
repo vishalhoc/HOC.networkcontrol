@@ -494,6 +494,66 @@ public sealed partial class DashboardPage : Page
         OnStatsTick(null, null!);
     }
 
+    // ── IMP#29: Copy-to-clipboard handlers ────────────────────────────────────
+    // Each copy button calls this helper with its target TextBlock text.
+    // The button's content briefly flashes "✓" for 1.5 s to confirm the copy.
+    private async void OnCopyInfo(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        string? text = btn.Tag?.ToString();
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        try
+        {
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(text);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+
+            // Brief "✓" flash on the button icon
+            var prev = btn.Content;
+            btn.Content = new FontIcon { Glyph = "\uE73E", FontSize = 11 }; // CheckMark glyph
+            await Task.Delay(1500);
+            btn.Content = prev;
+        }
+        catch { /* clipboard access can fail in sandbox/CI */ }
+    }
+
+    private void OnCopyIPv4(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn) btn.Tag = InfoIPv4.Text;
+        OnCopyInfo(sender, e);
+    }
+
+    private void OnCopyPublicIP(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn) btn.Tag = InfoPublicIP.Text;
+        OnCopyInfo(sender, e);
+    }
+
+    private void OnCopyGateway(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn) btn.Tag = InfoGateway.Text;
+        OnCopyInfo(sender, e);
+    }
+
+    private void OnCopyDns(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn) btn.Tag = InfoDns.Text;
+        OnCopyInfo(sender, e);
+    }
+
+    private void OnCopyMac(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn) btn.Tag = InfoMac.Text;
+        OnCopyInfo(sender, e);
+    }
+
+    private void OnCopyIPv6(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn) btn.Tag = InfoIPv6.Text;
+        OnCopyInfo(sender, e);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
     private static string FormatSpeed(double bytesPerSec)
     {

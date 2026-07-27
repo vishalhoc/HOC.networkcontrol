@@ -27,6 +27,13 @@ public partial class MainViewModel : ObservableObject
     private readonly System.Collections.Generic.HashSet<string> _vtScanningPaths
         = new(StringComparer.OrdinalIgnoreCase);
 
+    // FIX Bug#30: track in-flight block/unblock operations by process name.
+    // Rapid double-clicks on the block toggle can fire two parallel firewall
+    // rule additions, creating duplicate WinNetControl_Block_<name> rules that
+    // are never cleaned up. Drop the second call while the first is in-flight.
+    private readonly System.Collections.Generic.HashSet<string> _blockingInProgress
+        = new(StringComparer.OrdinalIgnoreCase);
+
 
     public AppConfig CurrentConfig { get; internal set; }
     public HttpProxyService ProxyService { get; }
@@ -615,41 +622,66 @@ public partial class MainViewModel : ObservableObject
         string name = process.ProcessName;
         string path = process.ProcessPath;
 
-        if (process.IsBlocked)
+        // BUG#30: drop duplicate calls while a firewall rule operation is in-flight
+        lock (_blockingInProgress)
         {
-            bool doIn  = blockInbound  ?? process.BlockInbound;
-            bool doOut = blockOutbound ?? process.BlockOutbound;
-
-            if (!doIn && !doOut) { doIn = true; doOut = true; }
-
-            process.BlockInbound  = doIn;
-            process.BlockOutbound = doOut;
-
-            if (!CurrentConfig.BlockedApps.Contains(name))                  CurrentConfig.BlockedApps.Add(name);
-            if (doIn  && !CurrentConfig.BlockedAppsInbound.Contains(name))  CurrentConfig.BlockedAppsInbound.Add(name);
-            if (!doIn)  CurrentConfig.BlockedAppsInbound.Remove(name);
-            if (doOut && !CurrentConfig.BlockedAppsOutbound.Contains(name)) CurrentConfig.BlockedAppsOutbound.Add(name);
-            if (!doOut) CurrentConfig.BlockedAppsOutbound.Remove(name);
-
-            _networkMonitor.KnownBlockedNames.Add(name);
-
-            if (!string.IsNullOrWhiteSpace(path))
-                System.Threading.Tasks.Task.Run(() => FirewallService.BlockApp(name, path, doIn, doOut));
+            if (!_blockingInProgress.Add(name)) return;
         }
-        else
+
+        try
         {
-            process.BlockInbound  = false;
-            process.BlockOutbound = false;
+            if (process.IsBlocked)
+            {
+                bool doIn  = blockInbound  ?? process.BlockInbound;
+                bool doOut = blockOutbound ?? process.BlockOutbound;
 
-            CurrentConfig.BlockedApps.Remove(name);
-            CurrentConfig.BlockedAppsInbound.Remove(name);
-            CurrentConfig.BlockedAppsOutbound.Remove(name);
-            _networkMonitor.KnownBlockedNames.Remove(name);
+                if (!doIn && !doOut) { doIn = true; doOut = true; }
 
-            System.Threading.Tasks.Task.Run(() => FirewallService.UnblockApp(name));
+                process.BlockInbound  = doIn;
+                process.BlockOutbound = doOut;
 
-            if (process.IsPhantom)
-                _dispatcherQueue?.TryEnqueue(() => { Processes.Remove(process); ApplyFilterAndSort(); });
+                if (!CurrentConfig.BlockedApps.Contains(name))                  CurrentConfig.BlockedApps.Add(name);
+                if (doIn  && !CurrentConfig.BlockedAppsInbound.Contains(name))  CurrentConfig.BlockedAppsInbound.Add(name);
+                if (!doIn)  CurrentConfig.BlockedAppsInbound.Remove(name);
+                if (doOut && !CurrentConfig.BlockedAppsOutbound.Contains(name)) CurrentConfig.BlockedAppsOutbound.Add(name);
+                if (!doOut) CurrentConfig.BlockedAppsOutbound.Remove(name);
+
+                _networkMonitor.KnownBlockedNames.Add(name);
+
+                if (!string.IsNullOrWhiteSpace(path))
+                    System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try { FirewallService.BlockApp(name, path, doIn, doOut); }
+                        finally { lock (_blockingInProgress) _blockingInProgress.Remove(name); }
+                    });
+                else
+                    lock (_blockingInProgress) _blockingInProgress.Remove(name);
+            }
+            else
+            {
+                process.BlockInbound  = false;
+                process.BlockOutbound = false;
+
+                CurrentConfig.BlockedApps.Remove(name);
+                CurrentConfig.BlockedAppsInbound.Remove(name);
+                CurrentConfig.BlockedAppsOutbound.Remove(name);
+                _networkMonitor.KnownBlockedNames.Remove(name);
+
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try { FirewallService.UnblockApp(name); }
+                    finally { lock (_blockingInProgress) _blockingInProgress.Remove(name); }
+                });
+
+                if (process.IsPhantom)
+                    _dispatcherQueue?.TryEnqueue(() => { Processes.Remove(process); ApplyFilterAndSort(); });
+            }
+        }
+        catch
+        {
+            // If we fail before launching the Task, make sure we release the lock
+            lock (_blockingInProgress) _blockingInProgress.Remove(name);
+            throw;
         }
 
         OnPropertyChanged(nameof(BlockedCountText));

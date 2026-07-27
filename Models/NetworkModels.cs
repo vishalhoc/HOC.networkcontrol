@@ -267,9 +267,25 @@ public partial class ProcessNetworkInfo : ObservableObject
     {
         get
         {
-            int n   = _speedHistory.Length;      // 30
-            var arr = new double[n];
-            int start = _speedHistoryIdx % n;    // oldest slot
+            int n   = _speedHistory.Length;   // 30
+
+            // BUG#19 FIX: until the ring buffer has wrapped at least once,
+            // _speedHistoryIdx is the EXACT count of samples pushed.
+            // Reading from _speedHistoryIdx % n would start in the middle of
+            // uninitialised zero-slots and return phantom data-points.
+            if (_speedHistoryIdx < n)
+            {
+                // Buffer not yet full: return only the samples we have so far,
+                // oldest (index 0) → newest (index _speedHistoryIdx-1).
+                var partial = new double[_speedHistoryIdx];
+                for (int i = 0; i < _speedHistoryIdx; i++)
+                    partial[i] = _speedHistory[i];
+                return partial;
+            }
+
+            // Buffer full: unwrap ring — start is the oldest slot.
+            var arr   = new double[n];
+            int start = _speedHistoryIdx % n;
             for (int i = 0; i < n; i++)
                 arr[i] = _speedHistory[(start + i) % n];
             return arr;

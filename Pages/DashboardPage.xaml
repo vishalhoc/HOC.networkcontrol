@@ -150,6 +150,7 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition/><RowDefinition/><RowDefinition/>
@@ -160,18 +161,38 @@
                             <TextBlock Text="IPv4" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoIPv4" Grid.Column="1" FontSize="11" FontWeight="SemiBold"
                                        Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <Button Grid.Column="2" Click="OnCopyIPv4" VerticalAlignment="Center"
+                                    Style="{StaticResource TransparentButtonStyle}" Padding="4" Margin="2,0,0,0"
+                                    ToolTipService.ToolTip="Copy IPv4 address">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="10"/>
+                            </Button>
 
                             <TextBlock Grid.Row="1" Text="Public IP" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoPublicIP" Grid.Row="1" Grid.Column="1" FontSize="11" FontWeight="SemiBold"
                                        Text="—" VerticalAlignment="Center"/>
+                            <Button Grid.Row="1" Grid.Column="2" Click="OnCopyPublicIP" VerticalAlignment="Center"
+                                    Style="{StaticResource TransparentButtonStyle}" Padding="4" Margin="2,0,0,0"
+                                    ToolTipService.ToolTip="Copy Public IP">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="10"/>
+                            </Button>
 
                             <TextBlock Grid.Row="2" Text="Gateway" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoGateway" Grid.Row="2" Grid.Column="1" FontSize="11"
                                        Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <Button Grid.Row="2" Grid.Column="2" Click="OnCopyGateway" VerticalAlignment="Center"
+                                    Style="{StaticResource TransparentButtonStyle}" Padding="4" Margin="2,0,0,0"
+                                    ToolTipService.ToolTip="Copy Gateway">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="10"/>
+                            </Button>
 
                             <TextBlock Grid.Row="3" Text="DNS" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoDns" Grid.Row="3" Grid.Column="1" FontSize="11"
                                        Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <Button Grid.Row="3" Grid.Column="2" Click="OnCopyDns" VerticalAlignment="Center"
+                                    Style="{StaticResource TransparentButtonStyle}" Padding="4" Margin="2,0,0,0"
+                                    ToolTipService.ToolTip="Copy DNS">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="10"/>
+                            </Button>
 
                             <TextBlock Grid.Row="4" Text="Adapter" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoAdapter" Grid.Row="4" Grid.Column="1" FontSize="11"
@@ -180,10 +201,20 @@
                             <TextBlock Grid.Row="5" Text="MAC" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoMac" Grid.Row="5" Grid.Column="1" FontSize="11" FontFamily="Consolas"
                                        Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <Button Grid.Row="5" Grid.Column="2" Click="OnCopyMac" VerticalAlignment="Center"
+                                    Style="{StaticResource TransparentButtonStyle}" Padding="4" Margin="2,0,0,0"
+                                    ToolTipService.ToolTip="Copy MAC address">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="10"/>
+                            </Button>
 
                             <TextBlock Grid.Row="6" Text="IPv6" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoIPv6" Grid.Row="6" Grid.Column="1" FontSize="11"
                                        Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <Button Grid.Row="6" Grid.Column="2" Click="OnCopyIPv6" VerticalAlignment="Center"
+                                    Style="{StaticResource TransparentButtonStyle}" Padding="4" Margin="2,0,0,0"
+                                    ToolTipService.ToolTip="Copy IPv6 address">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="10"/>
+                            </Button>
 
                             <TextBlock Grid.Row="7" Text="ISP" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock x:Name="InfoISP" Grid.Row="7" Grid.Column="1" FontSize="11"
