@@ -129,7 +129,13 @@
                         <FontIcon Glyph="&#xE9CE;"/>
                     </NavigationViewItem.Icon>
                     <NavigationViewItem.Content>
-                        <TextBlock Text="Connections"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Connections" VerticalAlignment="Center"/>
+                            <!-- UX#11: live status dot — green=clean, orange=blocked apps exist -->
+                            <Ellipse x:Name="NavConnDot" Width="7" Height="7"
+                                     Fill="#10B981" VerticalAlignment="Center"
+                                     ToolTipService.ToolTip="All apps unblocked"/>
+                        </StackPanel>
                     </NavigationViewItem.Content>
                 </NavigationViewItem>
 
@@ -249,7 +255,13 @@
                         <FontIcon Glyph="&#xE7BA;"/>
                     </NavigationViewItem.Icon>
                     <NavigationViewItem.Content>
-                        <TextBlock Text="Firewall"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Firewall" VerticalAlignment="Center"/>
+                            <!-- UX#11: live status dot — green=active rules exist, gray=no rules -->
+                            <Ellipse x:Name="NavFwDot" Width="7" Height="7"
+                                     Fill="#10B981" VerticalAlignment="Center"
+                                     ToolTipService.ToolTip="Firewall active"/>
+                        </StackPanel>
                     </NavigationViewItem.Content>
                 </NavigationViewItem>
 

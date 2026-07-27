@@ -13,6 +13,9 @@ public sealed partial class MainWindow : Window
 {
     public MainViewModel ViewModel { get; }
 
+    // UX#23: expose the InfoBar so pages can attach ActionButton for undo flows
+    public InfoBar AppToastBar => AppToast;
+
     // Current element theme (tracks user toggle)
     private ElementTheme _currentTheme = ElementTheme.Default;
 
@@ -50,6 +53,7 @@ public sealed partial class MainWindow : Window
 
         try { this.SetIcon("Assets\\AppIcon.ico"); } catch { }
         this.Closed += MainWindow_Closed;
+        this.SizeChanged += OnWindowSizeChanged; // UX#18: adaptive sidebar
 
         // Set title with version
         var ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
@@ -134,6 +138,16 @@ public sealed partial class MainWindow : Window
         catch { }
     }
 
+    // UX#18: adaptive sidebar — collapse to compact when window < 900 px wide
+    private void OnWindowSizeChanged(object sender, Microsoft.UI.Xaml.WindowSizeChangedEventArgs e)
+    {
+        // Only auto-collapse in "Left" (expanded) mode — never override Compact/Top preferences
+        if (NavView.PaneDisplayMode != Microsoft.UI.Xaml.Controls.NavigationViewPaneDisplayMode.Left)
+            return;
+
+        NavView.IsPaneOpen = e.Size.Width >= 900;
+    }
+
     // ── NavigationView events ──────────────────────────────────────────────────
 
     private void NavView_Loaded(object sender, RoutedEventArgs e)
@@ -205,7 +219,9 @@ public sealed partial class MainWindow : Window
         };
 
         if (pageType != null)
-            ContentFrame.Navigate(pageType, ViewModel);
+            // UX#5: subtle DrillIn transition — smooth fade+scale between pages
+            ContentFrame.Navigate(pageType, ViewModel,
+                new Microsoft.UI.Xaml.Media.Animation.DrillInNavigationTransitionInfo());
     }
 
     private void NavView_PaneOpening(NavigationView sender, object args) { }
@@ -275,11 +291,21 @@ public sealed partial class MainWindow : Window
                 {
                     HeaderBlockedBadge.Visibility = Visibility.Visible;
                     HeaderBlockedText.Text        = ViewModel.BlockedCountText;
+
+                    // UX#11: Connections dot — orange when blocked apps exist
+                    NavConnDot.Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        Microsoft.UI.ColorHelper.FromArgb(255, 251, 146, 60));  // orange-400
+                    ToolTipService.SetToolTip(NavConnDot, $"{blockedCount} app(s) blocked");
                 }
                 else
                 {
                     HeaderBlockedBadge.Visibility = Visibility.Collapsed;
                     HeaderBlockedText.Text        = string.Empty;
+
+                    // UX#11: Connections dot — green when all apps are unblocked
+                    NavConnDot.Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        Microsoft.UI.ColorHelper.FromArgb(255, 16, 185, 129));  // emerald-500
+                    ToolTipService.SetToolTip(NavConnDot, "All apps unblocked");
                 }
             });
         }
@@ -486,6 +512,58 @@ public sealed partial class MainWindow : Window
                 OnThemeToggleClicked(this, new RoutedEventArgs());
                 e.Handled = true;
                 break;
+
+            // UX#28: Ctrl+/ (OEM key 191) or F1 — show keyboard shortcut reference
+            case (Windows.System.VirtualKey)191 when ctrl:
+            case Windows.System.VirtualKey.F1:
+                ShowShortcutHelp();
+                e.Handled = true;
+                break;
         }
+    }
+
+    // ── UX#28: Keyboard shortcut help overlay ─────────────────────────────────
+    private async void ShowShortcutHelp()
+    {
+        const string shortcuts = """
+            Navigation
+            ──────────────────────────────
+            Ctrl+1       Dashboard
+            Ctrl+2       Connections
+            Ctrl+3       Firewall
+            Ctrl+4       Monitoring
+            Ctrl+5       Diagnostics
+            Ctrl+6       LAN Scanner
+            Ctrl+7       Packet Capture
+            Ctrl+8       Security
+            Ctrl+9       Settings
+
+            UI
+            ──────────────────────────────
+            Ctrl+Shift+T  Cycle theme (Dark / Light / System)
+            F5            Refresh process list
+            Ctrl+/  or F1 Show this help
+            """;
+
+        var dialog = new ContentDialog
+        {
+            Title           = "⌨  Keyboard Shortcuts",
+            Content         = new ScrollViewer
+            {
+                Content     = new TextBlock
+                {
+                    Text                = shortcuts,
+                    FontFamily          = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Courier New"),
+                    FontSize            = 13,
+                    TextWrapping        = TextWrapping.NoWrap,
+                    IsTextSelectionEnabled = true
+                },
+                MaxHeight   = 400
+            },
+            CloseButtonText = "Close",
+            XamlRoot        = this.Content.XamlRoot
+        };
+
+        try { await dialog.ShowAsync(); } catch { }
     }
 }

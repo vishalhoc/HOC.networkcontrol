@@ -50,7 +50,12 @@ public sealed partial class ConnectionManagerPage : Page
     {
         base.OnNavigatedTo(e);
         if (e.Parameter is MainViewModel vm)
+        {
             ViewModel = vm;
+            // UX#1: subscribe to watch for empty state
+            ViewModel.FilteredProcesses.CollectionChanged += OnFilteredProcessesChanged;
+            UpdateEmptyState();
+        }
         BlockedConnectionStore.ConnectionBlockChanged += OnExternalBlockChanged;
     }
 
@@ -58,6 +63,26 @@ public sealed partial class ConnectionManagerPage : Page
     {
         base.OnNavigatedFrom(e);
         BlockedConnectionStore.ConnectionBlockChanged -= OnExternalBlockChanged;
+        // UX#1: unsubscribe so GC can collect without holding page alive
+        if (ViewModel != null)
+            ViewModel.FilteredProcesses.CollectionChanged -= OnFilteredProcessesChanged;
+    }
+
+    // UX#1: empty-state helper
+    private void OnFilteredProcessesChanged(
+        object? sender,
+        System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        => UpdateEmptyState();
+
+    private void UpdateEmptyState()
+    {
+        if (EmptyState == null || ViewModel == null) return;
+        bool isEmpty = ViewModel.FilteredProcesses.Count == 0;
+        EmptyState.Visibility = isEmpty ? Visibility.Visible : Visibility.Collapsed;
+        if (isEmpty && !string.IsNullOrWhiteSpace(ViewModel.SearchText))
+            EmptyStateSub.Text = $"No results for \"{ViewModel.SearchText}\" — try a different name.";
+        else
+            EmptyStateSub.Text = "Start an app or remove your search filter to see traffic here.";
     }
 
     private void OnExternalBlockChanged(string processName, string remoteIp, int remotePort, int localPort, bool isBlocked)
@@ -126,6 +151,35 @@ public sealed partial class ConnectionManagerPage : Page
         ViewModel.SelectedFilter   = "All";
         ViewModel.SelectedSort     = "Data Used (High-Low)";
         ViewModel.SelectedProtocol = "All Proto";
+        UpdateChipHighlight("All");
+    }
+
+    // UX#6: quick-filter chip handler — sets SelectedFilter and highlights active chip
+    private void OnChipFilter(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string filter)
+        {
+            ViewModel.SelectedFilter = filter;
+            UpdateChipHighlight(filter);
+        }
+    }
+
+    private void UpdateChipHighlight(string activeFilter)
+    {
+        // Apply AccentButtonStyle to the active chip, reset others to default
+        var accent  = (Style)Application.Current.Resources["AccentButtonStyle"];
+        Style? def  = null; // null resets to default Button style
+
+        var chips = new[] {
+            (ChipAll,        "All"),
+            (ChipBlocked,    "Blocked Only"),
+            (ChipPhantom,    "Phantom (Offline)"),
+            (ChipSystem,     "Windows System"),
+            (ChipThirdParty, "Third-Party App"),
+        };
+
+        foreach (var (chip, tag) in chips)
+            chip.Style = tag == activeFilter ? accent : def;
     }
 
     // ── Reset Data ────────────────────────────────────────────────────────────
@@ -183,7 +237,51 @@ public sealed partial class ConnectionManagerPage : Page
     private void OnBlockToggled(object sender, RoutedEventArgs e)
     {
         if (sender is ToggleSwitch ts && ts.DataContext is ProcessNetworkInfo process)
+        {
             ViewModel.ToggleBlock(process);
+
+            // UX#23: show undo toast only when BLOCKING (not unblocking)
+            if (process.IsBlocked)
+                ShowUndoBlockToast(process);
+        }
+    }
+
+    // UX#23: Undo toast — 5-second window to reverse a block action
+    private async void ShowUndoBlockToast(ProcessNetworkInfo process)
+    {
+        var mw = App.MainWindow;
+        if (mw == null) return;
+
+        // Build an "Undo" button to attach as the InfoBar action
+        var undoBtn = new Button
+        {
+            Content = "Undo",
+            Style   = (Style)Application.Current.Resources["AccentButtonStyle"]
+        };
+
+        mw.AppToastBar.ActionButton = undoBtn;
+        mw.AppToastBar.Severity     = Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning;
+        mw.AppToastBar.Title        = "App Blocked";
+        mw.AppToastBar.Message      = $"{process.ProcessName} is now blocked.";
+        mw.AppToastBar.IsOpen       = true;
+
+        bool undone = false;
+        void OnUndo(object s, RoutedEventArgs _)
+        {
+            undone = true;
+            process.IsBlocked = false;
+            ViewModel.ToggleBlock(process);
+            mw.AppToastBar.IsOpen = false;
+            App.MainWindow?.ShowToast("Undo", $"{process.ProcessName} unblocked.", "info");
+        }
+        undoBtn.Click += OnUndo;
+
+        await System.Threading.Tasks.Task.Delay(5000);
+
+        undoBtn.Click -= OnUndo;
+        if (!undone && mw.AppToastBar.IsOpen)
+            mw.AppToastBar.IsOpen = false;
+        mw.AppToastBar.ActionButton = null;
     }
 
     // ── Block Inbound / Outbound (per-process) ────────────────────────────────
